@@ -1,4 +1,4 @@
-# mysumber
+# MySumber
 
 BMIT2073 Mobile Application Development assignment — Flutter app supporting
 SDG 9 (Industry, Innovation, and Infrastructure) using Malaysian government
