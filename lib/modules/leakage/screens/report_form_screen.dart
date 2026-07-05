@@ -45,14 +45,6 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Investigation report'),
-        actions: [
-          if (widget.existing?.id != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete report',
-              onPressed: () => _delete(app),
-            ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -157,15 +149,6 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
           _outcome == ReportOutcome.fixed
               ? AlertStatus.resolved
               : AlertStatus.notFixed);
-      if (mounted) Navigator.of(context).pop();
-    } catch (_) {
-      if (mounted) showNetworkErrorSnackBar(context);
-    }
-  }
-
-  Future<void> _delete(AppState app) async {
-    try {
-      await app.deleteReport(widget.existing!.id!);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) showNetworkErrorSnackBar(context);

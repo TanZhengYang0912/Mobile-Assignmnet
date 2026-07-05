@@ -63,10 +63,6 @@ class LeakageRepository {
         .eq('id', report.id!);
   }
 
-  Future<void> deleteReport(int id) async {
-    await _client.from('reports').update({'is_deleted': true}).eq('id', id);
-  }
-
   Future<Set<String>> nrwAlertStates() async {
     final rows = await _client
         .from('alerts')
@@ -83,16 +79,5 @@ class LeakageRepository {
         .eq('is_deleted', false)
         .order('updated_at', ascending: false);
     return rows.map((row) => Report.fromMap(row)).toList();
-  }
-
-  Future<Report?> reportForAlert(int alertId) async {
-    final rows = await _client
-        .from('reports')
-        .select()
-        .eq('alert_id', alertId)
-        .eq('is_deleted', false)
-        .order('updated_at', ascending: false)
-        .limit(1);
-    return rows.isEmpty ? null : Report.fromMap(rows.first);
   }
 }

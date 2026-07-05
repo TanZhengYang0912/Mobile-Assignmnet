@@ -115,9 +115,4 @@ class AppState extends ChangeNotifier {
     }
     await refresh();
   }
-
-  Future<void> deleteReport(int reportId) async {
-    await repository.deleteReport(reportId);
-    await refresh();
-  }
 }
