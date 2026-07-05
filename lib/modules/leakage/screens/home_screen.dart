@@ -34,24 +34,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Water leakage detection'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: DropdownButton<UserRole>(
-              value: app.role,
-              underline: const SizedBox.shrink(),
-              onChanged: (role) {
-                if (role != null) app.switchRole(role);
-              },
-              items: UserRole.values
-                  .map((r) => DropdownMenuItem(
-                        value: r,
-                        child: Text('Role: ${r.label}'),
-                      ))
-                  .toList(),
-            ),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

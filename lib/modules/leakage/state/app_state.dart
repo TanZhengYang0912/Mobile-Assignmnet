@@ -8,14 +8,6 @@ import '../services/explainer.dart';
 import '../services/nrw_service.dart';
 import '../services/simulation_service.dart';
 
-enum UserRole {
-  worker('Worker'),
-  admin('Admin');
-
-  final String label;
-  const UserRole(this.label);
-}
-
 class AppState extends ChangeNotifier {
   final BaselineService baseline;
   final NrwService nrw;
@@ -23,7 +15,6 @@ class AppState extends ChangeNotifier {
   final SimulationService simulation;
   final Explainer explainer;
 
-  UserRole _role = UserRole.worker;
   List<Alert> _alerts = [];
   List<Report> _reports = [];
   bool _loading = true;
@@ -36,8 +27,6 @@ class AppState extends ChangeNotifier {
     Explainer? explainer,
   }) : explainer = explainer ?? Explainer();
 
-  UserRole get role => _role;
-  bool get isAdmin => _role == UserRole.admin;
   String get workerName => 'Worker X';
   List<Alert> get alerts => _alerts;
   List<Report> get reports => _reports;
@@ -72,11 +61,6 @@ class AppState extends ChangeNotifier {
     await nrw.load();
     await refresh();
     _loading = false;
-    notifyListeners();
-  }
-
-  void switchRole(UserRole role) {
-    _role = role;
     notifyListeners();
   }
 
@@ -120,11 +104,6 @@ class AppState extends ChangeNotifier {
 
   Future<void> updateAlertStatus(int alertId, String status) async {
     await repository.updateAlertStatus(alertId, status);
-    await refresh();
-  }
-
-  Future<void> dismissAlert(int alertId) async {
-    await repository.dismissAlert(alertId);
     await refresh();
   }
 
