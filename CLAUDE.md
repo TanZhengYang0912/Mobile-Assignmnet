@@ -189,47 +189,70 @@ No cloud dependency. All data processed locally; findings stored in Provider sta
 
 ---
 
-## Module 0: Role Selection (Authentication)
+## Module 0: Authentication System
 
-### How It Works
-
-The app starts with a **role selection screen** (no password required):
-
+### Initial Screen: Role Selection
 ```
 ┌────────────────────────────────────┐
 │          mySumber                   │
-│  Select your role to continue       │
+│  Water & Electricity Anomaly        │
+│  Detection                          │
 │                                     │
-│      [Admin] [Consumer]             │
+│  [Admin Login] [Consumer Login]     │
 └────────────────────────────────────┘
 ```
 
-**Admin role:**
+### Admin Login
+- **Password:** `admin` (hardcoded local check)
+- No email required
+- Single administrator account
 - Access modules: 1 (Equipment), 3 (Leakage), 4 (Electricity)
-- Tabs: Equipment | Leakage | Electricity
 
-**Consumer role:**
-- Access modules: 2 (Personal Usage) only
-- Tabs: My Usage
+### Consumer Login / Registration
+**Registration flow:**
+1. Email + Password (min 8 characters)
+2. Confirm password + agree to terms
+3. Submit → Supabase sends verification email
+4. User verifies email (click link in email)
+5. Account created + auto-login → Consumer dashboard
+
+**Login flow:**
+1. Email + Password
+2. Submit → Authenticate via Supabase
+3. If valid → Auto-login → Consumer dashboard
+
+**Consumer access:** Module 2 (Personal Usage) only
+
+### Error Handling
+- Invalid admin password: "Invalid password"
+- Email already registered: Shows Supabase error
+- Weak password: Shows error (< 8 characters)
+- Wrong login credentials: Shows error
+- Invalid email format: Validated before submission
 
 ### AppBar with Logout
-
-Once logged in, the AppBar displays:
+Once logged in:
 - Title: `mySumber - ADMIN` or `mySumber - CONSUMER`
 - Logout button (top right)
-- Click Logout → returns to role selection screen
+- Click logout → Signs out (Supabase for consumers, local for admin) → Returns to role selection
 
 ### State Management
-
 ```dart
-AuthState (Provider)
+RoleState (Provider)
 ├── _userRole: "admin" | "consumer" | null
+├── _consumerEmail: String? (consumer only)
 ├── isLoggedIn: bool
-├── setRole(role): void
-└── logout(): void
+├── errorMessage: String?
+├── adminLogin(password): Future<bool>
+├── consumerLogin(email, password): Future<bool>
+├── consumerRegister(email, password): Future<bool>
+├── checkExistingSession(): void (checks on app start)
+└── logout(): Future<void>
 ```
 
-The role selection is **in-memory only** (not persistent). When the app closes, the user must select a role again.
+**Persistence:**
+- Admin: No persistence (session ends when app closes)
+- Consumer: Supabase manages session (persists until logout)
 
 ---
 

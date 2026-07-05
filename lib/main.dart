@@ -38,7 +38,11 @@ class MySumberApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<RoleState>(
-          create: (_) => RoleState(),
+          create: (_) {
+            final roleState = RoleState();
+            roleState.checkExistingSession();
+            return roleState;
+          },
         ),
         ChangeNotifierProvider<AppState>(
           create: (_) {
@@ -104,11 +108,7 @@ class MySumberApp extends StatelessWidget {
             if (authState.isLoggedIn) {
               return AppShell(userRole: authState.userRole!);
             } else {
-              return RoleSelectionScreen(
-                onRoleSelected: (role) {
-                  context.read<RoleState>().setRole(role);
-                },
-              );
+              return const RoleSelectionScreen();
             }
           },
         ),
@@ -171,6 +171,7 @@ class _AppShellState extends State<AppShell> {
         const WorkInProgressScreen(), // Module 2
       ];
       _tabColors = [
+
         Colors.blue.shade700,
       ];
       _navItems = const [
