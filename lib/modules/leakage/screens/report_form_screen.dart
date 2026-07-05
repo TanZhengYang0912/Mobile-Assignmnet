@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/alert.dart';
 import '../models/report.dart';
 import '../state/app_state.dart';
+import 'network_error.dart';
 
 class ReportFormScreen extends StatefulWidget {
   final Alert alert;
@@ -149,17 +150,25 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       outcome: _outcome,
       updatedAt: now,
     );
-    await app.saveReport(report);
-    await app.updateAlertStatus(
-        widget.alert.id!,
-        _outcome == ReportOutcome.fixed
-            ? AlertStatus.resolved
-            : AlertStatus.notFixed);
-    if (mounted) Navigator.of(context).pop();
+    try {
+      await app.saveReport(report);
+      await app.updateAlertStatus(
+          widget.alert.id!,
+          _outcome == ReportOutcome.fixed
+              ? AlertStatus.resolved
+              : AlertStatus.notFixed);
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) showNetworkErrorSnackBar(context);
+    }
   }
 
   Future<void> _delete(AppState app) async {
-    await app.deleteReport(widget.existing!.id!);
-    if (mounted) Navigator.of(context).pop();
+    try {
+      await app.deleteReport(widget.existing!.id!);
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) showNetworkErrorSnackBar(context);
+    }
   }
 }

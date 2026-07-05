@@ -1,95 +1,98 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../models/alert.dart';
 import '../models/reading.dart';
 import '../models/report.dart';
-import 'leakage_database.dart';
 
 class LeakageRepository {
-  final LeakageDatabase _database;
+  final SupabaseClient _client;
 
-  LeakageRepository([LeakageDatabase? database])
-      : _database = database ?? LeakageDatabase.instance;
+  LeakageRepository([SupabaseClient? client])
+      : _client = client ?? Supabase.instance.client;
 
   Future<int> insertReading(Reading reading) async {
-    final db = await _database.database;
-    return db.insert('readings', reading.toMap()..remove('id'));
+    final row = await _client
+        .from('readings')
+        .insert(reading.toMap()..remove('id'))
+        .select()
+        .single();
+    return row['id'] as int;
   }
 
   Future<int> insertAlert(Alert alert) async {
-    final db = await _database.database;
-    return db.insert('alerts', alert.toMap()..remove('id'));
+    final row = await _client
+        .from('alerts')
+        .insert(alert.toMap()..remove('id'))
+        .select()
+        .single();
+    return row['id'] as int;
   }
 
   Future<List<Alert>> alerts({bool includeDismissed = true}) async {
-    final db = await _database.database;
-    final where = includeDismissed
-        ? 'is_deleted = 0'
-        : 'is_deleted = 0 AND status != ?';
-    final args = includeDismissed ? null : [AlertStatus.dismissed];
-    final rows = await db.query('alerts',
-        where: where, whereArgs: args, orderBy: 'detected_at DESC');
-    return rows.map(Alert.fromMap).toList();
+    var query = _client.from('alerts').select().eq('is_deleted', false);
+    if (!includeDismissed) {
+      query = query.neq('status', AlertStatus.dismissed);
+    }
+    final rows = await query.order('detected_at', ascending: false);
+    return rows.map((row) => Alert.fromMap(row)).toList();
   }
 
   Future<Alert?> alertById(int id) async {
-    final db = await _database.database;
-    final rows = await db.query('alerts', where: 'id = ?', whereArgs: [id]);
-    if (rows.isEmpty) return null;
-    return Alert.fromMap(rows.first);
+    final row =
+        await _client.from('alerts').select().eq('id', id).maybeSingle();
+    return row == null ? null : Alert.fromMap(row);
   }
 
   Future<void> updateAlertStatus(int id, String status) async {
-    final db = await _database.database;
-    await db.update('alerts', {'status': status},
-        where: 'id = ?', whereArgs: [id]);
-  }
-
-  Future<void> dismissAlert(int id) async {
-    final db = await _database.database;
-    await db.update('alerts', {'status': AlertStatus.dismissed, 'is_deleted': 1},
-        where: 'id = ?', whereArgs: [id]);
+    await _client.from('alerts').update({'status': status}).eq('id', id);
   }
 
   Future<int> insertReport(Report report) async {
-    final db = await _database.database;
-    return db.insert('reports', report.toMap()..remove('id'));
+    final row = await _client
+        .from('reports')
+        .insert(report.toMap()..remove('id'))
+        .select()
+        .single();
+    return row['id'] as int;
   }
 
   Future<void> updateReport(Report report) async {
-    final db = await _database.database;
-    await db.update('reports', report.toMap()..remove('id'),
-        where: 'id = ?', whereArgs: [report.id]);
+    await _client
+        .from('reports')
+        .update(report.toMap()..remove('id'))
+        .eq('id', report.id!);
   }
 
   Future<void> deleteReport(int id) async {
-    final db = await _database.database;
-    await db.update('reports', {'is_deleted': 1},
-        where: 'id = ?', whereArgs: [id]);
+    await _client.from('reports').update({'is_deleted': true}).eq('id', id);
   }
 
   Future<Set<String>> nrwAlertStates() async {
-    final db = await _database.database;
-    final rows = await db.query('alerts',
-        columns: ['state'],
-        where: 'alert_type = ? AND is_deleted = 0',
-        whereArgs: [AlertType.nrwHotspot]);
-    return rows.map((r) => r['state'] as String).toSet();
+    final rows = await _client
+        .from('alerts')
+        .select('state')
+        .eq('alert_type', AlertType.nrwHotspot)
+        .eq('is_deleted', false);
+    return rows.map((row) => row['state'] as String).toSet();
   }
 
   Future<List<Report>> reports() async {
-    final db = await _database.database;
-    final rows = await db.query('reports',
-        where: 'is_deleted = 0', orderBy: 'updated_at DESC');
-    return rows.map(Report.fromMap).toList();
+    final rows = await _client
+        .from('reports')
+        .select()
+        .eq('is_deleted', false)
+        .order('updated_at', ascending: false);
+    return rows.map((row) => Report.fromMap(row)).toList();
   }
 
   Future<Report?> reportForAlert(int alertId) async {
-    final db = await _database.database;
-    final rows = await db.query('reports',
-        where: 'alert_id = ? AND is_deleted = 0',
-        whereArgs: [alertId],
-        orderBy: 'updated_at DESC',
-        limit: 1);
-    if (rows.isEmpty) return null;
-    return Report.fromMap(rows.first);
+    final rows = await _client
+        .from('reports')
+        .select()
+        .eq('alert_id', alertId)
+        .eq('is_deleted', false)
+        .order('updated_at', ascending: false)
+        .limit(1);
+    return rows.isEmpty ? null : Report.fromMap(rows.first);
   }
 }

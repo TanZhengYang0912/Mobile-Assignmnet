@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/simulation_service.dart';
 import '../state/app_state.dart';
 import 'alert_queue_screen.dart';
+import 'network_error.dart';
 import 'report_history_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -34,24 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Water leakage detection'),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: DropdownButton<UserRole>(
-              value: app.role,
-              underline: const SizedBox.shrink(),
-              onChanged: (role) {
-                if (role != null) app.switchRole(role);
-              },
-              items: UserRole.values
-                  .map((r) => DropdownMenuItem(
-                        value: r,
-                        child: Text('Role: ${r.label}'),
-                      ))
-                  .toList(),
-            ),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
@@ -147,29 +130,39 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _runAnalysis(AppState app) async {
     setState(() => _analysing = true);
-    final added = await app.runAnalysis();
-    if (!mounted) return;
-    setState(() => _analysing = false);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(added == 0
-          ? 'No new hotspots — all flagged states already in the queue.'
-          : 'Flagged $added leaking state(s) from real data.'),
-      backgroundColor: added == 0 ? Colors.blueGrey : Colors.red.shade600,
-    ));
+    try {
+      final added = await app.runAnalysis();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(added == 0
+            ? 'No new hotspots — all flagged states already in the queue.'
+            : 'Flagged $added leaking state(s) from real data.'),
+        backgroundColor: added == 0 ? Colors.blueGrey : Colors.red.shade600,
+      ));
+    } catch (_) {
+      if (mounted) showNetworkErrorSnackBar(context);
+    } finally {
+      if (mounted) setState(() => _analysing = false);
+    }
   }
 
   Future<void> _simulate(AppState app, LeakScenario scenario) async {
-    final outcome = await app.simulate(scenario, _selectedState);
-    if (!mounted) return;
-    final message = outcome.anomalyRaised
-        ? 'Alert raised: ${outcome.result.signature} '
-            '(${outcome.result.severity}, ${outcome.result.ratio.toStringAsFixed(1)}× average)'
-        : 'No anomaly: usage within normal range '
-            '(${outcome.result.ratio.toStringAsFixed(1)}× average)';
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor:
-          outcome.anomalyRaised ? Colors.red.shade600 : Colors.green.shade600,
-    ));
+    try {
+      final outcome = await app.simulate(scenario, _selectedState);
+      if (!mounted) return;
+      final message = outcome.anomalyRaised
+          ? 'Alert raised: ${outcome.result.signature} '
+              '(${outcome.result.severity}, ${outcome.result.ratio.toStringAsFixed(1)}× average)'
+          : 'No anomaly: usage within normal range '
+              '(${outcome.result.ratio.toStringAsFixed(1)}× average)';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(message),
+        backgroundColor: outcome.anomalyRaised
+            ? Colors.red.shade600
+            : Colors.green.shade600,
+      ));
+    } catch (_) {
+      if (mounted) showNetworkErrorSnackBar(context);
+    }
   }
 }

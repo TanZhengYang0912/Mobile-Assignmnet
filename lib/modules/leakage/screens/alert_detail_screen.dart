@@ -6,6 +6,7 @@ import '../models/alert.dart';
 import '../models/report.dart';
 import '../services/nrw_service.dart';
 import '../state/app_state.dart';
+import 'network_error.dart';
 import 'report_form_screen.dart';
 import 'style.dart';
 
@@ -53,6 +54,15 @@ class AlertDetailScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _updateStatus(
+      BuildContext context, AppState app, int alertId, String status) async {
+    try {
+      await app.updateAlertStatus(alertId, status);
+    } catch (_) {
+      if (context.mounted) showNetworkErrorSnackBar(context);
+    }
   }
 
   Report? _reportFor(AppState app, int alertId) {
@@ -205,7 +215,7 @@ class AlertDetailScreen extends StatelessWidget {
 
     if (alert.status == AlertStatus.pending) {
       children.add(_primary(context, 'Start investigation', Icons.play_arrow,
-          () => app.updateAlertStatus(alert.id!, AlertStatus.investigating)));
+          () => _updateStatus(context, app, alert.id!, AlertStatus.investigating)));
     } else if (alert.status == AlertStatus.investigating && report == null) {
       children.add(_primary(context, 'Write report', Icons.edit_note, () {
         Navigator.of(context).push(MaterialPageRoute(
@@ -213,7 +223,7 @@ class AlertDetailScreen extends StatelessWidget {
       }));
     } else if (alert.status == AlertStatus.notFixed) {
       children.add(_primary(context, 'Re-investigate', Icons.refresh,
-          () => app.updateAlertStatus(alert.id!, AlertStatus.investigating)));
+          () => _updateStatus(context, app, alert.id!, AlertStatus.investigating)));
     }
 
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
