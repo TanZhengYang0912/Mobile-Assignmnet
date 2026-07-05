@@ -8,6 +8,7 @@ import '../services/nrw_service.dart';
 import '../state/app_state.dart';
 import 'network_error.dart';
 import 'report_form_screen.dart';
+import 'report_view_screen.dart';
 import 'style.dart';
 
 class AlertDetailScreen extends StatelessWidget {
@@ -20,19 +21,27 @@ class AlertDetailScreen extends StatelessWidget {
     final match = app.alerts.where((a) => a.id == alertId);
     if (match.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Alert')),
+        appBar: AppBar(
+          title: const Text('Alert'),
+          backgroundColor: Colors.blue.shade700,
+          foregroundColor: Colors.white,
+        ),
         body: const Center(child: Text('This alert is no longer available.')),
       );
     }
     final alert = match.first;
-    final report = _reportFor(app, alertId);
+    final reports = _reportsFor(app, alertId);
     final date = DateFormat('d MMM y').format(alert.detectedAt);
     final subtitle = alert.isNrw
         ? 'NRW hotspot · ${alert.dataYear} data · flagged $date'
         : 'Household ${alert.householdId} · flagged $date';
 
     return Scaffold(
-      appBar: AppBar(title: Text(alert.state)),
+      appBar: AppBar(
+        title: Text(alert.state),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -50,7 +59,7 @@ class AlertDetailScreen extends StatelessWidget {
           const SizedBox(height: 16),
           _assessment(alert),
           const SizedBox(height: 20),
-          _actions(context, app, alert, report),
+          _actions(context, app, alert, reports),
         ],
       ),
     );
@@ -65,10 +74,8 @@ class AlertDetailScreen extends StatelessWidget {
     }
   }
 
-  Report? _reportFor(AppState app, int alertId) {
-    final match = app.reports.where((r) => r.alertId == alertId);
-    return match.isEmpty ? null : match.first;
-  }
+  List<Report> _reportsFor(AppState app, int alertId) =>
+      app.reports.where((r) => r.alertId == alertId).toList();
 
   Widget _nrwEvidence(BuildContext context, AppState app, Alert alert) {
     final billedShare =
@@ -114,7 +121,7 @@ class AlertDetailScreen extends StatelessWidget {
           child: Row(children: [
             Expanded(
                 flex: billedShare,
-                child: Container(height: 14, color: Colors.teal.shade400)),
+                child: Container(height: 14, color: Colors.blue.shade400)),
             Expanded(
                 flex: lostShare,
                 child: Container(height: 14, color: Colors.red.shade400)),
@@ -184,7 +191,7 @@ class AlertDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(Icons.lightbulb_outline, size: 18, color: Colors.teal.shade700),
+          Icon(Icons.lightbulb_outline, size: 18, color: Colors.blue.shade700),
           const SizedBox(width: 9),
           Expanded(
               child: Text(alert.explanation,
@@ -193,21 +200,21 @@ class AlertDetailScreen extends StatelessWidget {
       );
 
   Widget _actions(
-      BuildContext context, AppState app, Alert alert, Report? report) {
+      BuildContext context, AppState app, Alert alert, List<Report> reports) {
     final children = <Widget>[];
 
-    if (report != null) {
+    for (final report in reports) {
       children.add(Card(
         child: ListTile(
-          leading: Icon(report.isFixed ? Icons.check_circle_outline : Icons.build_outlined,
+          leading: Icon(
+              report.isFixed ? Icons.check_circle_outline : Icons.build_outlined,
               color: report.isFixed ? Colors.green : Colors.orange),
           title: Text('Report · ${ReportOutcome.label(report.outcome)}'),
           subtitle: Text(
               report.findings.isEmpty ? 'No findings recorded' : report.findings),
-          trailing: const Text('Edit'),
+          trailing: const Text('View'),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) =>
-                  ReportFormScreen(alert: alert, existing: report))),
+              builder: (_) => ReportViewScreen(report: report))),
         ),
       ));
       children.add(const SizedBox(height: 12));
@@ -216,7 +223,7 @@ class AlertDetailScreen extends StatelessWidget {
     if (alert.status == AlertStatus.pending) {
       children.add(_primary(context, 'Start investigation', Icons.play_arrow,
           () => _updateStatus(context, app, alert.id!, AlertStatus.investigating)));
-    } else if (alert.status == AlertStatus.investigating && report == null) {
+    } else if (alert.status == AlertStatus.investigating) {
       children.add(_primary(context, 'Write report', Icons.edit_note, () {
         Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => ReportFormScreen(alert: alert)));

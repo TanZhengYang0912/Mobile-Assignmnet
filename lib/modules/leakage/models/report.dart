@@ -62,24 +62,4 @@ class Report {
         updatedAt: DateTime.parse(map['updated_at'] as String),
         isDeleted: map['is_deleted'] as bool,
       );
-
-  Report copyWith({
-    int? id,
-    String? findings,
-    String? actionTaken,
-    String? outcome,
-    DateTime? updatedAt,
-    bool? isDeleted,
-  }) =>
-      Report(
-        id: id ?? this.id,
-        alertId: alertId,
-        workerName: workerName,
-        findings: findings ?? this.findings,
-        actionTaken: actionTaken ?? this.actionTaken,
-        outcome: outcome ?? this.outcome,
-        createdAt: createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-        isDeleted: isDeleted ?? this.isDeleted,
-      );
 }

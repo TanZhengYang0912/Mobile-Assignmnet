@@ -108,16 +108,7 @@ class AppState extends ChangeNotifier {
   }
 
   Future<void> saveReport(Report report) async {
-    if (report.id == null) {
-      await repository.insertReport(report);
-    } else {
-      await repository.updateReport(report);
-    }
-    await refresh();
-  }
-
-  Future<void> deleteReport(int reportId) async {
-    await repository.deleteReport(reportId);
+    await repository.insertReport(report);
     await refresh();
   }
 }

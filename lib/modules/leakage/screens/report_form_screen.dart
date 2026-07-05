@@ -9,25 +9,16 @@ import 'network_error.dart';
 
 class ReportFormScreen extends StatefulWidget {
   final Alert alert;
-  final Report? existing;
-  const ReportFormScreen({super.key, required this.alert, this.existing});
+  const ReportFormScreen({super.key, required this.alert});
 
   @override
   State<ReportFormScreen> createState() => _ReportFormScreenState();
 }
 
 class _ReportFormScreenState extends State<ReportFormScreen> {
-  late final TextEditingController _findings;
-  late final TextEditingController _action;
+  final _findings = TextEditingController();
+  final _action = TextEditingController();
   String? _outcome;
-
-  @override
-  void initState() {
-    super.initState();
-    _findings = TextEditingController(text: widget.existing?.findings ?? '');
-    _action = TextEditingController(text: widget.existing?.actionTaken ?? '');
-    _outcome = widget.existing?.outcome;
-  }
 
   @override
   void dispose() {
@@ -39,25 +30,18 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.read<AppState>();
-    final started = DateFormat('d MMM y, HH:mm').format(
-        widget.existing?.createdAt ?? DateTime.now());
+    final started = DateFormat('d MMM y, HH:mm').format(DateTime.now());
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Investigation report'),
-        actions: [
-          if (widget.existing?.id != null)
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete report',
-              onPressed: () => _delete(app),
-            ),
-        ],
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('${app.workerName} · ${widget.existing == null ? "started" : "opened"} $started',
+          Text('${app.workerName} · started $started',
               style: const TextStyle(fontSize: 12, color: Colors.black54)),
           const SizedBox(height: 16),
           const Text('Findings', style: TextStyle(fontWeight: FontWeight.w600)),
@@ -134,20 +118,13 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
       return;
     }
     final now = DateTime.now();
-    final report = (widget.existing ??
-            Report(
-              alertId: widget.alert.id!,
-              workerName: app.workerName,
-              findings: '',
-              actionTaken: '',
-              outcome: _outcome!,
-              createdAt: now,
-              updatedAt: now,
-            ))
-        .copyWith(
+    final report = Report(
+      alertId: widget.alert.id!,
+      workerName: app.workerName,
       findings: _findings.text.trim(),
       actionTaken: _action.text.trim(),
-      outcome: _outcome,
+      outcome: _outcome!,
+      createdAt: now,
       updatedAt: now,
     );
     try {
@@ -157,15 +134,6 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
           _outcome == ReportOutcome.fixed
               ? AlertStatus.resolved
               : AlertStatus.notFixed);
-      if (mounted) Navigator.of(context).pop();
-    } catch (_) {
-      if (mounted) showNetworkErrorSnackBar(context);
-    }
-  }
-
-  Future<void> _delete(AppState app) async {
-    try {
-      await app.deleteReport(widget.existing!.id!);
       if (mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) showNetworkErrorSnackBar(context);
