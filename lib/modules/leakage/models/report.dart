@@ -48,7 +48,7 @@ class Report {
         'outcome': outcome,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
-        'is_deleted': isDeleted ? 1 : 0,
+        'is_deleted': isDeleted,
       };
 
   factory Report.fromMap(Map<String, Object?> map) => Report(
@@ -60,7 +60,7 @@ class Report {
         outcome: map['outcome'] as String,
         createdAt: DateTime.parse(map['created_at'] as String),
         updatedAt: DateTime.parse(map['updated_at'] as String),
-        isDeleted: (map['is_deleted'] as int) == 1,
+        isDeleted: map['is_deleted'] as bool,
       );
 
   Report copyWith({
