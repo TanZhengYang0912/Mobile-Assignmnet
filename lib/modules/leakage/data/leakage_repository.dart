@@ -56,13 +56,6 @@ class LeakageRepository {
     return row['id'] as int;
   }
 
-  Future<void> updateReport(Report report) async {
-    await _client
-        .from('reports')
-        .update(report.toMap()..remove('id'))
-        .eq('id', report.id!);
-  }
-
   Future<Set<String>> nrwAlertStates() async {
     final rows = await _client
         .from('alerts')

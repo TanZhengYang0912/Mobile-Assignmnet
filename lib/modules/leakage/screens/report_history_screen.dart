@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../models/report.dart';
 import '../state/app_state.dart';
-import 'report_form_screen.dart';
+import 'report_view_screen.dart';
 
 class ReportHistoryScreen extends StatelessWidget {
   const ReportHistoryScreen({super.key});
@@ -41,12 +41,9 @@ class ReportHistoryScreen extends StatelessWidget {
                     '\nUpdated ${dateFormat.format(report.updatedAt)}',
                   ),
                   isThreeLine: true,
-                  onTap: alert == null
-                      ? null
-                      : () => Navigator.of(context).push(MaterialPageRoute(
-                            builder: (_) => ReportFormScreen(
-                                alert: alert, existing: report),
-                          )),
+                  onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => ReportViewScreen(report: report),
+                      )),
                 );
               },
             ),
