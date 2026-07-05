@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'modules/leakage/data/leakage_repository.dart';
 import 'modules/leakage/screens/home_screen.dart';
@@ -8,8 +9,12 @@ import 'modules/leakage/services/nrw_service.dart';
 import 'modules/leakage/services/simulation_service.dart';
 import 'modules/leakage/state/app_state.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Supabase.initialize(
+    url: 'https://tnmznkdvrrpigevxdfet.supabase.co',
+    publishableKey: 'sb_publishable_rPQeDFFfv1HQoYnqN2g9QQ_bLBVlaZE',
+  );
   runApp(const MySumberApp());
 }
 
