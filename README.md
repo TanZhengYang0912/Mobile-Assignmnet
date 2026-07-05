@@ -14,7 +14,7 @@ without stepping on each other.
 |---|---|---|---|
 | 1. Dataset Management | Import/version government datasets | Local | _assign_ |
 | 2. Personal Usage Comparison | Compare a household's usage to state average | Local | _assign_ |
-| 3. Water Leakage Detection | Detect leakage from real NRW data + simulated household readings | Local (cloud later) | Worker X |
+| 3. Water Leakage Detection | Detect leakage from real NRW data + simulated household readings | Cloud (Supabase) + local reference data | Worker X |
 | 4. Electricity Anomaly Detection | Detect meter tampering patterns | Local (cloud later) | _assign_ |
 
 ## Project structure
@@ -40,7 +40,7 @@ mysumber/
 │       │                       you actually works, day to day.
 │       │
 │       ├── leakage/           📁 Module 3 — Water Leakage Detection → Worker X opens THIS folder
-│       │   ├── data/          sqflite schema + repository (CRUD)
+│       │   ├── data/          Supabase repository (CRUD against the cloud tables)
 │       │   ├── models/        Alert, Report, Reading — plain data classes
 │       │   ├── services/      Detection engine, NRW analysis, baseline, explainer, simulation
 │       │   ├── state/         AppState — the module's single source of truth (Provider)
@@ -81,9 +81,52 @@ After cloning, run `flutter pub get` once — it rebuilds everything ignored.
 
 Government CSVs under `assets/` are **read-only reference data**. No module
 should ever rewrite them at runtime — investigating or resolving an alert
-changes the alert/report records in the local database, never the source
-dataset. Re-importing a newer government dataset version is Module 1's job
-(dataset versioning), not something the other modules do.
+changes the alert/report records in Supabase, never the source dataset.
+Re-importing a newer government dataset version is Module 1's job (dataset
+versioning), not something the other modules do.
+
+## Cloud database (Supabase) — Module 3
+
+Module 3's operational data (`readings`, `alerts`, `reports`) lives in a
+shared Supabase (Postgres) project, not on the device. The government CSVs
+and detection logic stay local and bundled — only the data that needs to be
+seen across devices/workers moves to the cloud.
+
+### Two different things, easy to mix up
+
+| | Who needs it | What it's for |
+|---|---|---|
+| **Running the app** | Everyone, automatically | The app connects using a public anon key already in the code. Clone the repo, run the app — you're on the same shared database as everyone else. No login, no setup. |
+| **Managing the database via Claude Code / MCP** | Only if you want direct query/schema access | Requires your own Supabase login *and* being invited as a member of the project (see below). |
+
+### If you just want to run the app
+
+Nothing to do — `flutter pub get` pulls in `supabase_flutter`, and the app
+connects automatically. You'll see the same alerts/reports your teammates
+create, in real time across devices, because it's one shared cloud
+database instead of a private file on each phone.
+
+### If you want Claude Code to manage the Supabase project directly
+
+1. Ask the project owner to invite you: Supabase dashboard → project →
+   **Project Settings → Team** → **Invite member** (your email).
+2. Accept the invite.
+3. In a plain terminal (not the IDE extension): `cd` into the repo, run
+   `claude`, then `/mcp` → select **supabase** → **Authenticate** → log in
+   via the browser popup.
+4. Restart your Claude Code session once — a session that was already
+   running before you authenticate won't pick up the newly connected
+   server.
+
+### Security note
+
+Row Level Security (RLS) is enabled on all three tables with permissive
+policies, since the app currently simulates a single "Worker X" persona
+with no real login — there's no per-user identity yet to restrict by. This
+is a deliberate, documented simplification (see the Supabase migration
+design spec under `docs/superpowers/specs/`), not an oversight. RLS should
+never be disabled outright, and the anon key is the only key that belongs
+in app code — never commit a Supabase `service_role` key anywhere.
 
 ---
 
