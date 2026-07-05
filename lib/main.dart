@@ -66,8 +66,30 @@ class MySumberApp extends StatelessWidget {
         title: 'mySumber',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorSchemeSeed: Colors.teal,
+          colorSchemeSeed: Colors.blue,
           useMaterial3: true,
+          scaffoldBackgroundColor: Colors.grey.shade50,
+          appBarTheme: const AppBarTheme(
+            elevation: 0,
+            scrolledUnderElevation: 1,
+            centerTitle: false,
+          ),
+          cardTheme: CardThemeData(
+            elevation: 0,
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+          ),
+          filledButtonTheme: FilledButtonThemeData(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(46),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
         ),
         home: const AppShell(),
       ),
@@ -91,6 +113,12 @@ class _AppShellState extends State<AppShell> {
     const ElectricityDashboardScreen(), // Module 4
   ];
 
+  static final List<Color> _tabColors = [
+    Colors.teal.shade700, // Module 1
+    Colors.blue.shade700, // Module 3
+    Colors.amber.shade700, // Module 4
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,6 +126,7 @@ class _AppShellState extends State<AppShell> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) => setState(() => _currentIndex = index),
+        selectedItemColor: _tabColors[_currentIndex],
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard),

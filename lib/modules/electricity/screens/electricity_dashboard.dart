@@ -172,7 +172,7 @@ class _ElectricityDashboardScreenState extends State<ElectricityDashboardScreen>
           LineChartBarData(
             spots: lossesSpots,
             isCurved: true,
-            color: Colors.red.withOpacity(0.5),
+            color: Colors.red.withValues(alpha: 0.5),
             barWidth: 2,
             isStrokeCapRound: true,
             dotData: FlDotData(

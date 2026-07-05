@@ -21,7 +21,11 @@ class AlertDetailScreen extends StatelessWidget {
     final match = app.alerts.where((a) => a.id == alertId);
     if (match.isEmpty) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Alert')),
+        appBar: AppBar(
+          title: const Text('Alert'),
+          backgroundColor: Colors.blue.shade700,
+          foregroundColor: Colors.white,
+        ),
         body: const Center(child: Text('This alert is no longer available.')),
       );
     }
@@ -33,7 +37,11 @@ class AlertDetailScreen extends StatelessWidget {
         : 'Household ${alert.householdId} · flagged $date';
 
     return Scaffold(
-      appBar: AppBar(title: Text(alert.state)),
+      appBar: AppBar(
+        title: Text(alert.state),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -113,7 +121,7 @@ class AlertDetailScreen extends StatelessWidget {
           child: Row(children: [
             Expanded(
                 flex: billedShare,
-                child: Container(height: 14, color: Colors.teal.shade400)),
+                child: Container(height: 14, color: Colors.blue.shade400)),
             Expanded(
                 flex: lostShare,
                 child: Container(height: 14, color: Colors.red.shade400)),
@@ -183,7 +191,7 @@ class AlertDetailScreen extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
         ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Icon(Icons.lightbulb_outline, size: 18, color: Colors.teal.shade700),
+          Icon(Icons.lightbulb_outline, size: 18, color: Colors.blue.shade700),
           const SizedBox(width: 9),
           Expanded(
               child: Text(alert.explanation,

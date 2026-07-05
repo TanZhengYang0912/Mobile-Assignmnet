@@ -13,7 +13,11 @@ class ReportViewScreen extends StatelessWidget {
     final outcomeColor = report.isFixed ? Colors.green : Colors.orange;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Investigation report')),
+      appBar: AppBar(
+        title: const Text('Investigation report'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

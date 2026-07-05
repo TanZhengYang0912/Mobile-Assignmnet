@@ -35,12 +35,14 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Water leakage detection'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           Card(
-            color: Colors.teal.shade50,
+            color: Colors.blue.shade50,
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -53,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   Text(
                       'Compares state water production and consumption from data.gov.my to flag Non-Revenue Water hotspots.',
                       style: TextStyle(
-                          fontSize: 13, color: Colors.teal.shade900)),
+                          fontSize: 13, color: Colors.blue.shade900)),
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     style: FilledButton.styleFrom(

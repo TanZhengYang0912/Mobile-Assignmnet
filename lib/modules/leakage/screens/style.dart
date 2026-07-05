@@ -9,7 +9,7 @@ Color severityColor(String severity) {
     case Severity.medium:
       return Colors.orange.shade700;
     case Severity.low:
-      return Colors.blue.shade600;
+      return Colors.teal.shade600;
     default:
       return Colors.blueGrey;
   }

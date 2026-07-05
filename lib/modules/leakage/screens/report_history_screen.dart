@@ -16,7 +16,11 @@ class ReportHistoryScreen extends StatelessWidget {
     final dateFormat = DateFormat('d MMM y, HH:mm');
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Report history')),
+      appBar: AppBar(
+        title: const Text('Report history'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
+      ),
       body: reports.isEmpty
           ? const Center(child: Text('No reports yet.'))
           : ListView.separated(

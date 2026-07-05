@@ -303,7 +303,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2)),
           ],
         ),
         child: ListTile(
@@ -438,7 +438,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -457,7 +457,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                     borderRadius: BorderRadius.circular(8),
                     color: Colors.blueGrey,
                     selectedColor: _chartUtility == 'Water' ? Colors.blue : Colors.amber,
-                    fillColor: (_chartUtility == 'Water' ? Colors.blue : Colors.amber).withOpacity(0.1),
+                    fillColor: (_chartUtility == 'Water' ? Colors.blue : Colors.amber).withValues(alpha: 0.1),
                     children: const [
                       Icon(Icons.water_drop, size: 16),
                       Icon(Icons.bolt, size: 16),

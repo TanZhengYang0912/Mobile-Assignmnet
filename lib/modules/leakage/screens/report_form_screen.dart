@@ -35,6 +35,8 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Investigation report'),
+        backgroundColor: Colors.blue.shade700,
+        foregroundColor: Colors.white,
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

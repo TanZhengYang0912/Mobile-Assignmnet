@@ -49,10 +49,17 @@ class _AlertQueueScreenState extends State<AlertQueueScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Leakage alerts'),
-          bottom: TabBar(tabs: [
-            Tab(text: 'Unresolved · ${app.unresolvedAlerts.length}'),
-            Tab(text: 'Resolved · ${app.resolvedAlerts.length}'),
-          ]),
+          backgroundColor: Colors.blue.shade700,
+          foregroundColor: Colors.white,
+          bottom: TabBar(
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            indicatorColor: Colors.white,
+            tabs: [
+              Tab(text: 'Unresolved · ${app.unresolvedAlerts.length}'),
+              Tab(text: 'Resolved · ${app.resolvedAlerts.length}'),
+            ],
+          ),
         ),
         body: Column(
           children: [
