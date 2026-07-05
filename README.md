@@ -256,3 +256,25 @@ If GitHub Desktop reports a conflict:
 The final submission requires **all AI-use disclosed** (Appendix A) and
 **all comments removed from the codebase** before the final ZIP — do this as
 a last pass right before packaging, not during development.
+
+## Module 4 Implementation Progress
+
+**Owner:** Chun Jie Tan (Assigned)
+
+### 1. Unified Dataset Engine
+- Updated the backend state management (`dataset_state.dart`) to read and parse **all 4 actual CSV datasets** simultaneously: `water_production.csv`, `water_consumption.csv`, `electricity_supply.csv`, and `electricity_consumption.csv`.
+- Built the engine to normalize and aggregate dataset values by state dynamically.
+
+### 2. Dual-Bar Variance Chart
+- Upgraded the previous single-bar chart into a **Double-Bar comparison chart** on the main dashboard (`dashboard_screen.dart`).
+- Mapped state usage dynamically, displaying two side-by-side bars (Supply vs. Billed Consumption). 
+- Implemented visual gap analysis to map out utility loss or theft.
+
+### 3. Theft & Leakage Detection Engine
+- Developed a dynamic **Theft & Leakage Detection** UI component.
+- The system mathematically calculates `Supply - Billed Consumption` for every single state.
+- Highlights the exact state with the highest **Water Leakage** (lost liters) and the highest **Electricity Theft/Loss** (discrepant kW) actively on the dashboard.
+
+### 4. Electricity Anomaly Alignment
+- Updated the anomaly parsing logic inside `ElectricityDataService` to properly handle and parse the new dataset schema (`state, date, sector, value`).
+- Ensured total supply and total consumption correctly aggregate across all states by date to track Z-score anomalies effectively.
