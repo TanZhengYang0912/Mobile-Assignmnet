@@ -47,3 +47,6 @@ app.*.map.json
 # Local-only, not shared with the team
 /test/
 /docs/superpowers/
+
+# API keys — never commit
+lib/config.dart
