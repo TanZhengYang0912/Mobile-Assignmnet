@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
@@ -154,38 +153,6 @@ class DatasetState extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       debugPrint('Error loading aggregated data: $e');
-    }
-  }
-
-  /// Hidden function to generate fake data for demo
-  Future<void> generateFakeDataForSelectedNode() async {
-    if (selectedNode == null || selectedNode!.nodeId == null) return;
-    
-    isLoading = true;
-    notifyListeners();
-    
-    final nodeId = selectedNode!.nodeId!;
-    final random = Random();
-
-    try {
-      if (currentLogs.isEmpty) {
-        // Fallback if CSV failed
-        for (int i = 0; i < 30; i++) {
-          final value = 90.0 + random.nextDouble() * 20.0;
-          await repository.insertLogAndAnalyze(nodeId, value, selectedNode!);
-        }
-      }
-
-      // Inject final data point with massive spike
-      final baseVal = currentLogs.isNotEmpty ? currentLogs.last.usageValue : 100.0;
-      await repository.insertLogAndAnalyze(nodeId, baseVal * 3.5, selectedNode!);
-
-      // Refresh logs
-      await selectNode(selectedNode!);
-    } catch (e) {
-      debugPrint('Error generating fake data: $e');
-      isLoading = false;
-      notifyListeners();
     }
   }
 }

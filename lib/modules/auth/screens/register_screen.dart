@@ -2,34 +2,103 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/auth_state.dart';
-import 'consumer_registration_screen.dart';
 
-class ConsumerLoginScreen extends StatefulWidget {
+class RegisterScreen extends StatefulWidget {
   final VoidCallback onBack;
 
-  const ConsumerLoginScreen({super.key, required this.onBack});
+  const RegisterScreen({super.key, required this.onBack});
 
   @override
-  State<ConsumerLoginScreen> createState() => _ConsumerLoginScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
+class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
   bool _showPassword = false;
+  bool _showConfirmPassword = false;
+  bool _agreedToTerms = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
+  String? _validateEmail(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Email is required';
+    }
+    if (!RegExp(r'^[^@]+@[^@]+\.[^@]+').hasMatch(value)) {
+      return 'Please enter a valid email';
+    }
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Password is required';
+    }
+    if (value.length < 8) {
+      return 'Password must be at least 8 characters';
+    }
+    return null;
+  }
+
+  String? _validateConfirmPassword(String? value) {
+    if (value == null || value.isEmpty) {
+      return 'Please confirm your password';
+    }
+    if (value != _passwordController.text) {
+      return 'Passwords do not match';
+    }
+    return null;
+  }
+
+  Future<void> _register() async {
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please agree to the terms')),
+      );
+      return;
+    }
+
+    final emailError = _validateEmail(_emailController.text);
+    final passwordError = _validatePassword(_passwordController.text);
+    final confirmError =
+        _validateConfirmPassword(_confirmPasswordController.text);
+
+    if (emailError != null || passwordError != null || confirmError != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(emailError ?? passwordError ?? confirmError!)),
+      );
+      return;
+    }
+
     final auth = context.read<RoleState>();
-    final success = await auth.consumerLogin(_emailController.text, _passwordController.text);
+    final success = await auth.register(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
     if (success && mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Account created! Logging in...',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.green,
+        ),
+      );
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
     }
   }
 
@@ -37,7 +106,7 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Consumer Login'),
+        title: const Text('Create Account'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
         leading: IconButton(
@@ -48,16 +117,15 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(height: 40),
+            const SizedBox(height: 20),
             const Text(
-              'Login',
+              'Sign Up',
               style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 8),
             Text(
-              'Sign in to your account',
+              'Create a new account',
               style: TextStyle(fontSize: 16, color: Colors.grey.shade600),
             ),
             const SizedBox(height: 40),
@@ -83,7 +151,7 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
                       obscureText: !_showPassword,
                       decoration: InputDecoration(
                         labelText: 'Password',
-                        hintText: 'Enter your password',
+                        hintText: 'At least 8 characters',
                         prefixIcon: const Icon(Icons.lock),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(10),
@@ -98,7 +166,44 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
                               setState(() => _showPassword = !_showPassword),
                         ),
                       ),
-                      onSubmitted: (_) => _login(),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _confirmPasswordController,
+                      obscureText: !_showConfirmPassword,
+                      decoration: InputDecoration(
+                        labelText: 'Confirm Password',
+                        hintText: 'Re-enter your password',
+                        prefixIcon: const Icon(Icons.lock),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _showConfirmPassword
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () => setState(
+                              () => _showConfirmPassword = !_showConfirmPassword),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _agreedToTerms,
+                          onChanged: (value) =>
+                              setState(() => _agreedToTerms = value ?? false),
+                        ),
+                        Expanded(
+                          child: Text(
+                            'I agree to the terms and conditions',
+                            style: TextStyle(color: Colors.grey.shade600),
+                          ),
+                        ),
+                      ],
                     ),
                     if (auth.errorMessage != null)
                       Padding(
@@ -137,7 +242,7 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: FilledButton.icon(
-                        onPressed: auth.isLoading ? null : _login,
+                        onPressed: auth.isLoading ? null : _register,
                         icon: auth.isLoading
                             ? const SizedBox(
                                 width: 16,
@@ -146,31 +251,10 @@ class _ConsumerLoginScreenState extends State<ConsumerLoginScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Icon(Icons.login),
-                        label: Text(auth.isLoading ? 'Signing in...' : 'Sign In'),
+                            : const Icon(Icons.person_add),
+                        label:
+                            Text(auth.isLoading ? 'Creating...' : 'Create Account'),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          "Don't have an account? ",
-                          style: TextStyle(color: Colors.grey.shade600),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ConsumerRegistrationScreen(
-                                  onBack: () => Navigator.pop(context),
-                                ),
-                              ),
-                            );
-                          },
-                          child: const Text('Sign Up'),
-                        ),
-                      ],
                     ),
                   ],
                 );

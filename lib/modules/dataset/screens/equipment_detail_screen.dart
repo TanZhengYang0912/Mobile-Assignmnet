@@ -22,67 +22,6 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
         title: const Text('Equipment Details'),
         backgroundColor: Colors.teal.shade700,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            tooltip: 'Run AI Spike Demo',
-            icon: const Icon(Icons.auto_graph),
-            onPressed: () async {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Generating Demo Data Spike...')),
-              );
-              
-              await context.read<DatasetState>().generateFakeDataForSelectedNode();
-              
-              if (!context.mounted) return;
-
-              final logs = context.read<DatasetState>().currentLogs;
-              if (logs.isNotEmpty && logs.last.isAnomaly) {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    backgroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16), 
-                      side: const BorderSide(color: Colors.red, width: 2)
-                    ),
-                    title: Row(
-                      children: const [
-                        Icon(Icons.warning_amber_rounded, color: Colors.red, size: 32),
-                        SizedBox(width: 8),
-                        Expanded(child: Text('CRITICAL ANOMALY', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18))),
-                      ],
-                    ),
-                    content: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('The AI System has detected a massive spike in usage (Z-Score > 3.0).'),
-                        const SizedBox(height: 16),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
-                          child: Row(
-                            children: const [
-                              Icon(Icons.assignment_late, color: Colors.red),
-                              SizedBox(width: 12),
-                              Expanded(child: Text('Automated action taken:\nA "Pipe Inspection" workflow has been dispatched to the maintenance team.', style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500))),
-                            ],
-                          ),
-                        )
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text('ACKNOWLEDGE ALERT', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.red)),
-                      )
-                    ],
-                  ),
-                );
-              }
-            },
-          )
-        ],
       ),
       body: Consumer<DatasetState>(
         builder: (context, state, child) {
@@ -187,7 +126,7 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           SizedBox(
             height: 250,
             child: state.currentLogs.isEmpty
-                ? const Center(child: Text('No historical data available. Run demo.'))
+                ? const Center(child: Text('No historical data available.'))
                 : _buildLineChart(state),
           ),
         ],

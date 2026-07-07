@@ -13,6 +13,25 @@ class Explainer {
         'Recommend a field inspection of the district network.';
   }
 
+  String describeElectricityLoss(NrwResult r, double nationalPct) {
+    final pct = r.lossPct.toStringAsFixed(1);
+    final national = nationalPct.toStringAsFixed(1);
+    return '${r.state} shows $pct% of supplied electricity unaccounted for in '
+        '${r.year}, above the national average of $national%. A gap this large '
+        'between supply and metered consumption points to distribution losses '
+        'or meter tampering. Recommend a field audit of the distribution grid.';
+  }
+
+  String describeTampering(int year, double lossPct, double lossKwh) {
+    final pct = lossPct.toStringAsFixed(1);
+    final kwh = lossKwh.round();
+    return 'National electricity losses spiked to $pct% of supply '
+        '($kwh kWh) in this period of $year — a statistically abnormal jump '
+        '(z-score above the tampering threshold) versus the surrounding months. '
+        'Consistent with large-scale meter tampering or an unmetered draw. '
+        'Recommend a grid-level investigation.';
+  }
+
   String describe(Reading reading, DetectionResult result) {
     final ratioText = result.ratio.toStringAsFixed(1);
     final actual = result.actualL.round();

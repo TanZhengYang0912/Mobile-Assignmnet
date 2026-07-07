@@ -1,17 +1,28 @@
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+/// Hardcoded staff email -> role lookup. Anyone not listed here signs in
+/// as a normal user. Fix first; swap for a `profiles` table once role
+/// management needs to be self-service.
+const Map<String, String> _staffRoles = {
+  'admin@mysumber.my': 'admin',
+  'worker@mysumber.my': 'worker',
+};
+
 class RoleState extends ChangeNotifier {
   String? _userRole;
-  String? _consumerEmail;
+  String? _email;
   bool _isLoading = false;
   String? _errorMessage;
 
   String? get userRole => _userRole;
-  String? get consumerEmail => _consumerEmail;
+  String? get email => _email;
   bool get isLoggedIn => _userRole != null;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
+  String _resolveRole(String? email) =>
+      _staffRoles[email?.toLowerCase()] ?? 'user';
 
   void clearError() {
     _errorMessage = null;
@@ -22,8 +33,8 @@ class RoleState extends ChangeNotifier {
     try {
       final session = Supabase.instance.client.auth.currentSession;
       if (session != null) {
-        _userRole = 'consumer';
-        _consumerEmail = session.user.email;
+        _email = session.user.email;
+        _userRole = _resolveRole(_email);
         notifyListeners();
       }
     } catch (e) {
@@ -31,32 +42,7 @@ class RoleState extends ChangeNotifier {
     }
   }
 
-  Future<bool> adminLogin(String password) async {
-    _isLoading = true;
-    _errorMessage = null;
-    notifyListeners();
-
-    try {
-      if (password.trim() == 'admin') {
-        _userRole = 'admin';
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      } else {
-        _errorMessage = 'Invalid password';
-        _isLoading = false;
-        notifyListeners();
-        return false;
-      }
-    } catch (e) {
-      _errorMessage = 'Error: ${e.toString()}';
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> consumerRegister(String email, String password) async {
+  Future<bool> register(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -72,8 +58,8 @@ class RoleState extends ChangeNotifier {
           email: email,
           password: password,
         );
-        _userRole = 'consumer';
-        _consumerEmail = email;
+        _email = email;
+        _userRole = _resolveRole(email);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -96,7 +82,7 @@ class RoleState extends ChangeNotifier {
     }
   }
 
-  Future<bool> consumerLogin(String email, String password) async {
+  Future<bool> login(String email, String password) async {
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
@@ -108,8 +94,8 @@ class RoleState extends ChangeNotifier {
       );
 
       if (response.user != null) {
-        _userRole = 'consumer';
-        _consumerEmail = email;
+        _email = email;
+        _userRole = _resolveRole(email);
         _isLoading = false;
         notifyListeners();
         return true;
@@ -139,7 +125,7 @@ class RoleState extends ChangeNotifier {
     try {
       await Supabase.instance.client.auth.signOut();
       _userRole = null;
-      _consumerEmail = null;
+      _email = null;
       _errorMessage = null;
       _isLoading = false;
       notifyListeners();

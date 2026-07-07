@@ -34,7 +34,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Investigation report'),
+        title: const Text('Investigation Report'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
@@ -55,7 +55,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          const Text('Action taken',
+          const Text('Action Taken',
               style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           TextField(
@@ -75,7 +75,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
                     Icons.check, Colors.green)),
             const SizedBox(width: 10),
             Expanded(
-                child: _outcomeButton(ReportOutcome.notFixed, 'Not fixed',
+                child: _outcomeButton(ReportOutcome.notFixed, 'Not Fixed',
                     Icons.warning_amber, Colors.orange)),
           ]),
           const SizedBox(height: 8),
@@ -87,7 +87,7 @@ class _ReportFormScreenState extends State<ReportFormScreen> {
           FilledButton.icon(
             style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
             icon: const Icon(Icons.save_outlined),
-            label: const Text('Save report'),
+            label: const Text('Save Report'),
             onPressed: () => _save(app),
           ),
         ],
