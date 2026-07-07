@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../theme/tokens.dart';
 import '../models/alert.dart';
 import '../models/report.dart';
 import '../state/app_state.dart';
@@ -23,7 +24,7 @@ class AlertDetailScreen extends StatelessWidget {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Alert'),
-          backgroundColor: Colors.blue.shade700,
+          backgroundColor: AppColors.workerPrimary,
           foregroundColor: Colors.white,
         ),
         body: const Center(child: Text('This alert is no longer available.')),
@@ -33,30 +34,70 @@ class AlertDetailScreen extends StatelessWidget {
     final reports = _reportsFor(app, alertId);
     final date = DateFormat('d MMM y').format(alert.detectedAt);
     final subtitle = alertSubtitle(alert, date);
+    final primary = alert.isElectricity
+        ? AppColors.electricityAccent
+        : AppColors.workerPrimary;
 
     return Scaffold(
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
         title: Text(alert.state),
-        backgroundColor: Colors.blue.shade700,
+        backgroundColor: primary,
         foregroundColor: Colors.white,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         children: [
-          Row(children: [
-            pill(Severity.label(alert.severity), severityColor(alert.severity)),
-            const SizedBox(width: 8),
-            pill(AlertStatus.label(alert.status), statusColor(alert.status)),
-          ]),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  Pill(Severity.label(alert.severity),
+                      color: severityColor(alert.severity)),
+                  const SizedBox(width: 8),
+                  Pill(AlertStatus.label(alert.status),
+                      color: statusColor(alert.status)),
+                ]),
+                const SizedBox(height: 8),
+                Text(alert.title,
+                    style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary)),
+                const SizedBox(height: 4),
+                Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
           const SizedBox(height: 10),
-          Text(subtitle,
-              style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          const SizedBox(height: 18),
-          alertEvidence(context, app, alert),
+          AppCard(
+            child: alertEvidence(context, app, alert),
+          ),
+          const SizedBox(height: 10),
+          AppCard(
+            background: const Color(0xFFF0F9FF),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.lightbulb_outline,
+                    size: 18, color: AppColors.workerPrimary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(alert.explanation,
+                      style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.5,
+                          color: AppColors.textPrimary)),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 16),
-          alertAssessment(alert),
-          const SizedBox(height: 20),
-          _actions(context, app, alert, reports),
+          _actions(context, app, alert, reports, primary),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -74,51 +115,81 @@ class AlertDetailScreen extends StatelessWidget {
   List<Report> _reportsFor(AppState app, int alertId) =>
       app.reports.where((r) => r.alertId == alertId).toList();
 
-  Widget _actions(
-      BuildContext context, AppState app, Alert alert, List<Report> reports) {
+  Widget _actions(BuildContext context, AppState app, Alert alert,
+      List<Report> reports, Color primary) {
     final children = <Widget>[];
 
     for (final report in reports) {
-      children.add(Card(
+      children.add(AppCard(
+        padding: EdgeInsets.zero,
         child: ListTile(
-          leading: Icon(
-              report.isFixed ? Icons.check_circle_outline : Icons.build_outlined,
-              color: report.isFixed ? Colors.green : Colors.orange),
-          title: Text('Report · ${ReportOutcome.label(report.outcome)}'),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: (report.isFixed ? AppColors.success : AppColors.warning)
+                  .withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              report.isFixed
+                  ? Icons.check_circle_outline
+                  : Icons.build_outlined,
+              color: report.isFixed ? AppColors.success : AppColors.warning,
+              size: 18,
+            ),
+          ),
+          title: Text('Report · ${ReportOutcome.label(report.outcome)}',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w600, fontSize: 14)),
           subtitle: Text(
-              report.findings.isEmpty ? 'No findings recorded' : report.findings),
-          trailing: const Text('View'),
+              report.findings.isEmpty ? 'No findings recorded' : report.findings,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+                  const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          trailing: const Icon(Icons.chevron_right,
+              color: AppColors.textTertiary),
           onTap: () => Navigator.of(context).push(MaterialPageRoute(
               builder: (_) => ReportViewScreen(report: report))),
         ),
       ));
-      children.add(const SizedBox(height: 12));
+      children.add(const SizedBox(height: 10));
     }
 
     if (alert.status == AlertStatus.pending) {
-      children.add(_primary(context, 'Start Investigation', Icons.play_arrow,
+      children.add(_primaryBtn(context, 'Start Investigation',
+          Icons.play_arrow, primary,
           () => _updateStatus(context, app, alert.id!, AlertStatus.investigating)));
     } else if (alert.status == AlertStatus.investigating) {
-      children.add(_primary(context, 'Write Report', Icons.edit_note, () {
+      children.add(_primaryBtn(context, 'Write Report', Icons.edit_note,
+          primary, () {
         Navigator.of(context).push(MaterialPageRoute(
             builder: (_) => ReportFormScreen(alert: alert)));
       }));
     } else if (alert.status == AlertStatus.notFixed) {
-      children.add(_primary(context, 'Re-Investigate', Icons.refresh,
+      children.add(_primaryBtn(context, 'Re-Investigate', Icons.refresh,
+          primary,
           () => _updateStatus(context, app, alert.id!, AlertStatus.investigating)));
     }
 
+    if (children.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: children);
   }
 
-  Widget _primary(
-      BuildContext context, String label, IconData icon, VoidCallback onTap) {
+  Widget _primaryBtn(BuildContext context, String label, IconData icon,
+      Color color, VoidCallback onTap) {
     return FilledButton.icon(
       onPressed: onTap,
       icon: Icon(icon),
       label: Text(label),
       style: FilledButton.styleFrom(
-          minimumSize: const Size.fromHeight(46)),
+        backgroundColor: color,
+        minimumSize: const Size.fromHeight(50),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
     );
   }
 }

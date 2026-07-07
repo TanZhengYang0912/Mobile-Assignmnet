@@ -2,19 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../theme/tokens.dart';
+import '../../auth/state/auth_state.dart';
 import '../../leakage/models/alert.dart';
 import '../../leakage/models/report.dart';
 import '../../leakage/screens/report_view_screen.dart';
 import '../../leakage/screens/style.dart';
 import '../../leakage/state/app_state.dart';
+import 'abnormal_production_screen.dart';
 import 'admin_alert_detail_screen.dart';
 
+enum OversightSection { alerts, reports }
+
 /// Admin oversight of the worker's alert queue and report history.
-/// Alerts are grouped by status (Pending/Ongoing/Solved/Faults) and can be
-/// filtered by utility; tapping one opens the read-only detail + gate.
-/// Reports are filterable by utility, outcome, and state.
+/// The nav bar routes each section (Alerts / Oversight) to this same screen
+/// with a different `section` argument so the header stays consistent.
 class OversightScreen extends StatefulWidget {
-  const OversightScreen({super.key});
+  final OversightSection section;
+  const OversightScreen(
+      {super.key, this.section = OversightSection.alerts});
 
   @override
   State<OversightScreen> createState() => _OversightScreenState();
@@ -25,34 +31,116 @@ class _OversightScreenState extends State<OversightScreen> {
   Utility? _reportUtility;
   String? _reportOutcome;
   String? _reportState;
+  final _reportSearch = TextEditingController();
+
+  @override
+  void dispose() {
+    _reportSearch.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+    final isAlerts = widget.section == OversightSection.alerts;
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Oversight'),
-          backgroundColor: Colors.teal.shade700,
-          foregroundColor: Colors.white,
-          bottom: const TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
-            tabs: [
-              Tab(text: 'Alert Queue'),
-              Tab(text: 'Reports'),
-            ],
+    return Scaffold(
+      backgroundColor: AppColors.canvas,
+      body: Column(
+        children: [
+          _header(context),
+          Expanded(
+            child: isAlerts ? _alertQueueTab(app) : _reportsTab(app),
           ),
+        ],
+      ),
+      floatingActionButton: isAlerts
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.adminPrimary,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add_alert_outlined),
+              label: const Text('Report State'),
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const AbnormalProductionScreen())),
+            )
+          : null,
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.adminPrimary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
         ),
-        body: TabBarView(
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      child: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _alertQueueTab(app),
-            _reportsTab(app),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'mySumber · ADMIN',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => context.read<RoleState>().logout(),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.logout, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text('Logout',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Oversight',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 24,
+                fontWeight: FontWeight.w800,
+                height: 1.15,
+              ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _countBadge(int count) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppColors.criticalSurface,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        '$count',
+        style: const TextStyle(
+            color: AppColors.critical,
+            fontSize: 11,
+            fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -69,20 +157,32 @@ class _OversightScreenState extends State<OversightScreen> {
       length: 4,
       child: Column(
         children: [
-          _utilityToggle(_alertUtility, (u) => setState(() => _alertUtility = u)),
-          TabBar(
-            isScrollable: true,
-            labelColor: Colors.teal.shade700,
-            unselectedLabelColor: Colors.black54,
-            indicatorColor: Colors.teal.shade700,
-            tabs: [
-              Tab(text: 'Pending (${pending.length})'),
-              Tab(text: 'Ongoing (${ongoing.length})'),
-              Tab(text: 'Solved (${solved.length})'),
-              Tab(text: 'Faults (${faults.length})'),
-            ],
+          Container(
+            color: AppColors.surface,
+            child: TabBar(
+              isScrollable: true,
+              tabAlignment: TabAlignment.start,
+              labelColor: AppColors.adminPrimary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.adminPrimary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 13),
+              tabs: [
+                _statusTab('Pending', pending.length),
+                _statusTab('Ongoing', ongoing.length),
+                _statusTab('Solved', solved.length),
+                _statusTab('Faults', faults.length),
+              ],
+            ),
           ),
           const Divider(height: 1),
+          Container(
+            color: AppColors.canvas,
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+            child: _utilityToggle(_alertUtility,
+                (u) => setState(() => _alertUtility = u)),
+          ),
           Expanded(
             child: TabBarView(
               children: [
@@ -98,40 +198,29 @@ class _OversightScreenState extends State<OversightScreen> {
     );
   }
 
-  Widget _alertList(List<Alert> alerts, String emptyMessage) {
-    if (alerts.isEmpty) {
-      return Center(child: Text(emptyMessage));
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: alerts.length,
-      itemBuilder: (context, index) => _compactAlertCard(context, alerts[index]),
+  Widget _statusTab(String label, int count) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label),
+          const SizedBox(width: 6),
+          _countBadge(count),
+        ],
+      ),
     );
   }
 
-  Widget _compactAlertCard(BuildContext context, Alert alert) {
-    final date = DateFormat('d MMM').format(alert.detectedAt);
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => AdminAlertDetailScreen(alertId: alert.id!))),
-        leading: Icon(
-          alert.isElectricity ? Icons.bolt_outlined : Icons.water_drop_outlined,
-          color: severityColor(alert.severity),
-        ),
-        title: Text(alert.title,
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('Flagged $date'),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            pill(Severity.label(alert.severity), severityColor(alert.severity)),
-            const SizedBox(width: 4),
-            const Icon(Icons.chevron_right, color: Colors.black38),
-          ],
-        ),
-      ),
+  Widget _alertList(List<Alert> alerts, String emptyMessage) {
+    if (alerts.isEmpty) {
+      return Center(
+          child: Text(emptyMessage,
+              style: const TextStyle(color: AppColors.textSecondary)));
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(12, 4, 12, 24),
+      itemCount: alerts.length,
+      itemBuilder: (context, index) => _AlertCard(alert: alerts[index]),
     );
   }
 
@@ -139,92 +228,219 @@ class _OversightScreenState extends State<OversightScreen> {
 
   Widget _reportsTab(AppState app) {
     final states = app.alerts.map((a) => a.state).toSet().toList()..sort();
-    final reports = app.reportsFiltered(
+    final query = _reportSearch.text.trim().toLowerCase();
+    var reports = app.reportsFiltered(
       utility: _reportUtility,
       outcome: _reportOutcome,
       state: _reportState,
     );
+    if (query.isNotEmpty) {
+      final alertById = {
+        for (final a in app.alerts)
+          if (a.id != null) a.id!: a,
+      };
+      reports = reports.where((r) {
+        final alert = alertById[r.alertId];
+        final state = alert?.state.toLowerCase() ?? '';
+        return state.contains(query) ||
+            r.findings.toLowerCase().contains(query) ||
+            r.actionTaken.toLowerCase().contains(query);
+      }).toList();
+    }
 
-    return Column(
+    final total = app.reportsFiltered(utility: _reportUtility).length;
+    final fixed = app
+        .reportsFiltered(utility: _reportUtility, outcome: ReportOutcome.fixed)
+        .length;
+    final notFixed = app
+        .reportsFiltered(
+            utility: _reportUtility, outcome: ReportOutcome.notFixed)
+        .length;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       children: [
-        _reportFilters(states),
-        Expanded(
-          child: reports.isEmpty
-              ? const Center(child: Text('No reports match these filters.'))
-              : _reportList(app, reports),
+        Row(
+          children: [
+            Expanded(
+              child: StatCell(
+                icon: Icons.description_outlined,
+                iconColor: AppColors.textPrimary,
+                value: total.toString(),
+                label: 'Total',
+                background: const Color(0xFFF3F4F6),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: StatCell(
+                icon: Icons.check_circle_outline,
+                iconColor: AppColors.success,
+                value: fixed.toString(),
+                label: 'Fixed',
+                background: AppColors.successSurface,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: StatCell(
+                icon: Icons.warning_amber_outlined,
+                iconColor: AppColors.warning,
+                value: notFixed.toString(),
+                label: 'Not Fixed',
+                background: AppColors.warningSurface,
+              ),
+            ),
+          ],
         ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _reportSearch,
+          onChanged: (_) => setState(() {}),
+          decoration: InputDecoration(
+            hintText: 'Search location or notes',
+            hintStyle: const TextStyle(color: AppColors.textTertiary),
+            prefixIcon: const Icon(Icons.search, color: AppColors.textTertiary),
+            isDense: true,
+            filled: true,
+            fillColor: AppColors.surface,
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _dropdown(
+                  value: _reportState,
+                  hint: 'All States',
+                  items: [
+                    const DropdownMenuItem(
+                        value: null, child: Text('All States')),
+                    ...states.map(
+                        (s) => DropdownMenuItem(value: s, child: Text(s))),
+                  ],
+                  onChanged: (v) => setState(() => _reportState = v)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _dropdown(
+                  value: _reportUtility?.name,
+                  hint: 'All Types',
+                  items: const [
+                    DropdownMenuItem(value: null, child: Text('All Types')),
+                    DropdownMenuItem(value: 'water', child: Text('Water')),
+                    DropdownMenuItem(
+                        value: 'electricity', child: Text('Electricity')),
+                  ],
+                  onChanged: (v) => setState(() {
+                        _reportUtility = v == null
+                            ? null
+                            : Utility.values.firstWhere((u) => u.name == v);
+                      })),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _outcomeToggle('All', _reportOutcome == null,
+                  () => setState(() => _reportOutcome = null)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _outcomeToggle('Fixed',
+                  _reportOutcome == ReportOutcome.fixed,
+                  () => setState(() => _reportOutcome = ReportOutcome.fixed)),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _outcomeToggle(
+                  'Not Fixed',
+                  _reportOutcome == ReportOutcome.notFixed,
+                  () => setState(
+                      () => _reportOutcome = ReportOutcome.notFixed)),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        if (reports.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: Text('No reports match these filters.',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+          )
+        else
+          ...reports.map((r) => _ReportCard(report: r, app: app)),
       ],
     );
   }
 
-  Widget _reportFilters(List<String> states) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
-      child: Column(
-        children: [
-          _utilityToggle(_reportUtility, (u) => setState(() => _reportUtility = u)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              _choiceChip('All', _reportOutcome == null,
-                  () => setState(() => _reportOutcome = null)),
-              const SizedBox(width: 8),
-              _choiceChip('Fixed', _reportOutcome == ReportOutcome.fixed,
-                  () => setState(() => _reportOutcome = ReportOutcome.fixed)),
-              const SizedBox(width: 8),
-              _choiceChip(
-                  'Not Fixed',
-                  _reportOutcome == ReportOutcome.notFixed,
-                  () => setState(() => _reportOutcome = ReportOutcome.notFixed)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String?>(
-            initialValue: _reportState,
-            isDense: true,
-            decoration: const InputDecoration(
-              labelText: 'State',
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('All States')),
-              ...states.map((s) => DropdownMenuItem(value: s, child: Text(s))),
-            ],
-            onChanged: (v) => setState(() => _reportState = v),
-          ),
-        ],
+  Widget _dropdown({
+    required String? value,
+    required String hint,
+    required List<DropdownMenuItem<String?>> items,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<String?>(
+          value: value,
+          isExpanded: true,
+          isDense: true,
+          hint: Text(hint,
+              style: const TextStyle(
+                  fontSize: 13, color: AppColors.textSecondary)),
+          items: items,
+          onChanged: onChanged,
+          style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w600),
+        ),
       ),
     );
   }
 
-  Widget _reportList(AppState app, List<Report> reports) {
-    final dateFormat = DateFormat('d MMM y, HH:mm');
-    return ListView.separated(
-      padding: const EdgeInsets.all(12),
-      itemCount: reports.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final report = reports[index];
-        final matches = app.alerts.where((a) => a.id == report.alertId);
-        final alertTitle =
-            matches.isEmpty ? 'Alert #${report.alertId}' : matches.first.title;
-        return ListTile(
-          leading: Icon(
-            report.isFixed ? Icons.check_circle_outline : Icons.build_outlined,
-            color: report.isFixed ? Colors.green : Colors.orange,
+  Widget _outcomeToggle(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.adminPrimary : AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: selected ? AppColors.adminPrimary : AppColors.divider),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: selected ? Colors.white : AppColors.textPrimary,
           ),
-          title: Text('$alertTitle · ${ReportOutcome.label(report.outcome)}'),
-          subtitle: Text(
-            '${report.findings.isEmpty ? "No findings" : report.findings}\n'
-            'Updated ${dateFormat.format(report.updatedAt)}',
-          ),
-          isThreeLine: true,
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => ReportViewScreen(report: report))),
-        );
-      },
+        ),
+      ),
     );
   }
 
@@ -233,37 +449,376 @@ class _OversightScreenState extends State<OversightScreen> {
   Widget _utilityToggle(Utility? current, ValueChanged<Utility?> onChanged) {
     return Row(
       children: [
-        _choiceChip('All', current == null, () => onChanged(null)),
+        _utilityChip('All', current == null, () => onChanged(null)),
         const SizedBox(width: 8),
-        _choiceChip('Water', current == Utility.water,
-            () => onChanged(Utility.water), icon: Icons.water_drop),
+        _utilityChip('Water', current == Utility.water,
+            () => onChanged(Utility.water),
+            icon: Icons.water_drop_outlined),
         const SizedBox(width: 8),
-        _choiceChip('Electricity', current == Utility.electricity,
-            () => onChanged(Utility.electricity), icon: Icons.bolt),
+        _utilityChip('Electricity', current == Utility.electricity,
+            () => onChanged(Utility.electricity),
+            icon: Icons.electric_bolt_outlined),
       ],
     );
   }
 
-  Widget _choiceChip(String label, bool selected, VoidCallback onTap,
+  Widget _utilityChip(String label, bool selected, VoidCallback onTap,
       {IconData? icon}) {
-    return ChoiceChip(
-      label: Row(mainAxisSize: MainAxisSize.min, children: [
-        if (icon != null) ...[
-          Icon(icon, size: 14, color: selected ? Colors.white : Colors.blueGrey),
-          const SizedBox(width: 4),
-        ],
-        Text(label),
-      ]),
-      selected: selected,
-      onSelected: (_) => onTap(),
-      selectedColor: Colors.teal.shade600,
-      labelStyle: TextStyle(
-        color: selected ? Colors.white : Colors.blueGrey,
-        fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.adminPrimary : AppColors.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+              color: selected ? AppColors.adminPrimary : AppColors.divider),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14,
+                  color: selected ? Colors.white : AppColors.textPrimary),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
       ),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: selected ? Colors.transparent : Colors.grey.shade300),
-      showCheckmark: false,
+    );
+  }
+}
+
+class _AlertCard extends StatelessWidget {
+  final Alert alert;
+  const _AlertCard({required this.alert});
+
+  @override
+  Widget build(BuildContext context) {
+    final sev = alert.severity;
+    final sevColor = severityColor(sev);
+    final isWater = alert.utility == Utility.water;
+    final utilityColor =
+        isWater ? AppColors.waterAccent : AppColors.electricityAccent;
+    final utilityBg =
+        isWater ? AppColors.waterSurface : AppColors.electricitySurface;
+    final utilityIcon =
+        isWater ? Icons.water_drop_outlined : Icons.electric_bolt_outlined;
+    final utilityLabel = isWater ? 'Water' : 'Electricity';
+    final date = DateFormat('d MMM').format(alert.detectedAt);
+
+    final usesLossPct = alert.lossPct != null;
+    final metric = usesLossPct
+        ? '${alert.lossPct!.toStringAsFixed(1)}%'
+        : '${alert.ratio.toStringAsFixed(1)}x';
+    final metricUnit =
+        usesLossPct ? 'of supply lost' : 'of state average';
+
+    final typeLabel = _typeLabel(alert.alertType);
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => AdminAlertDetailScreen(alertId: alert.id!))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(width: 4, color: sevColor),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 6,
+                                    crossAxisAlignment:
+                                        WrapCrossAlignment.center,
+                                    children: [
+                                      Text(
+                                        alert.title,
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          fontWeight: FontWeight.w700,
+                                          color: AppColors.textPrimary,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: utilityBg,
+                                          borderRadius:
+                                              BorderRadius.circular(999),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(utilityIcon,
+                                                size: 12, color: utilityColor),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              utilityLabel,
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: utilityColor,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Pill(
+                                  Severity.label(alert.severity),
+                                  color: sevColor,
+                                  background:
+                                      sevColor.withValues(alpha: 0.12),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '$typeLabel · Flagged $date',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                            if (alert.baselineL > 0 ||
+                                alert.lossPct != null) ...[
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(Icons.trending_up,
+                                      size: 14, color: sevColor),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '$metric $metricUnit',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: sevColor,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right,
+                          color: AppColors.textTertiary, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _typeLabel(String type) {
+    switch (type) {
+      case AlertType.nrwHotspot:
+        return 'NRW Hotspot';
+      case AlertType.electricityHotspot:
+        return 'Electricity Loss';
+      case AlertType.electricityTampering:
+        return 'Tampering';
+      default:
+        return 'Household';
+    }
+  }
+}
+
+class _ReportCard extends StatelessWidget {
+  final Report report;
+  final AppState app;
+  const _ReportCard({required this.report, required this.app});
+
+  @override
+  Widget build(BuildContext context) {
+    final isFixed = report.isFixed;
+    final outcomeColor = isFixed ? AppColors.success : AppColors.warning;
+    final outcomeBg =
+        isFixed ? AppColors.successSurface : AppColors.warningSurface;
+    final matches = app.alerts.where((a) => a.id == report.alertId);
+    final alert = matches.isEmpty ? null : matches.first;
+    final state = alert?.state ?? 'Unknown';
+    final isWater = alert?.utility == Utility.water;
+    final utilityColor =
+        isWater ? AppColors.waterAccent : AppColors.electricityAccent;
+    final utilityBg =
+        isWater ? AppColors.waterSurface : AppColors.electricitySurface;
+    final utilityIcon =
+        isWater ? Icons.water_drop_outlined : Icons.electric_bolt_outlined;
+    final utilityLabel = isWater ? 'Water' : 'Electricity';
+    final date = DateFormat('d MMM y, HH:mm').format(report.updatedAt);
+    final description = report.findings.isEmpty
+        ? (isFixed ? 'No findings. Sensor reading normalized.' : 'No findings recorded.')
+        : report.findings;
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => ReportViewScreen(report: report))),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0F000000),
+              blurRadius: 10,
+              offset: Offset(0, 3),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  isFixed
+                      ? Icons.check_circle
+                      : Icons.warning_amber_rounded,
+                  color: outcomeColor,
+                  size: 22,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  state,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Pill(
+                  isFixed ? 'Fixed' : 'Not Fixed',
+                  color: outcomeColor,
+                  background: outcomeBg,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              description,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: utilityBg,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(utilityIcon, size: 12, color: utilityColor),
+                      const SizedBox(width: 4),
+                      Text(
+                        utilityLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: utilityColor,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Text(
+                  date,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textTertiary,
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.customerSurface,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.person_outline,
+                          size: 12, color: AppColors.customerPrimary),
+                      const SizedBox(width: 4),
+                      Text(
+                        report.workerName,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.customerPrimary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

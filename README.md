@@ -1,4 +1,4 @@
-# MySumber
+# mySumber
 
 BMIT2073 Mobile Application Development assignment — Flutter app supporting
 SDG 9 (Industry, Innovation, and Infrastructure) using Malaysian government
@@ -8,273 +8,264 @@ Each team member owns one module. This README documents where everything
 lives and the exact GitHub Desktop steps the team follows so branches merge
 without stepping on each other.
 
+---
+
 ## Modules and owners
 
-| Module | Description | Storage | Owner |
+| Module | Description | Storage | Status |
 |---|---|---|---|
-| 1. Dataset Management | Import/version government datasets | Local | _assign_ |
-| 2. Personal Usage Comparison | Compare a household's usage to state average | Local | _assign_ |
-| 3. Water Leakage Detection | Detect leakage from real NRW data + simulated household readings | Cloud (Supabase) + local reference data | Worker X |
-| 4. Electricity Anomaly Detection | Detect meter tampering patterns | Local (cloud later) | _assign_ |
+| 1. Equipment Management | Import/version government datasets, dual-bar variance chart, anomaly detection | Local CSV | ✅ Complete |
+| 2. Customer Experience | Personal usage comparison, repair report flow, service review & AI insights | Local + Cloud (Supabase) | ✅ Complete |
+| 3. Water Leakage Detection | Detect leakage from real NRW data + simulated household readings, worker alert queue | Cloud (Supabase) + Local CSV | ✅ Complete |
+| 4. Electricity Anomaly Detection | Detect meter tampering patterns, electricity loss hotspot analysis | Local CSV + Cloud (Supabase) | ✅ Complete |
+
+---
+
+## User Roles
+
+| Role | Login | Access |
+|---|---|---|
+| **Admin** | Password: `admin` | Equipment dashboard, alerts oversight, reports, service reviews & AI insights |
+| **Worker** | Password: `worker` | Water alert queue, electricity alert queue, field report submission |
+| **Customer** | Email + password (Supabase Auth) | Home dashboard, usage comparison, repair history, AI service summary |
+
+---
 
 ## Project structure
 
 ```
 mysumber/
-├── android/, ios/, ...        Flutter platform folders (not usually hand-edited)
+├── android/, ios/, ...           Flutter platform folders
 │
-├── assets/                    ⚠️ SHARED — read-only reference datasets, used by
-│   │                             multiple modules. Don't delete or restructure
-│   │                             existing files; only add new ones.
-│   ├── water_consumption.csv  data.gov.my — domestic/nondomestic consumption by state
-│   └── water_production.csv   data.gov.my — water production by state
+├── assets/                       Read-only government reference datasets
+│   ├── water_consumption.csv     data.gov.my — domestic/nondomestic consumption by state
+│   ├── water_production.csv      data.gov.my — water production by state
+│   ├── electricity_consumption.csv
+│   └── electricity_supply.csv
 │
-├── docs/superpowers/specs/    Design specs (one markdown file per feature, dated)
+├── supabase/
+│   └── functions/
+│       └── generate-ai-summary/  (unused — AI now called directly from Flutter)
+│           └── index.ts
 │
 ├── lib/
-│   ├── main.dart              ⚠️ SHARED — app entry point, wires every module's
-│   │                             provider together. Everyone eventually adds a
-│   │                             couple of lines here. Coordinate before editing.
+│   ├── main.dart                 App entry point, role-based navigation shell
+│   ├── config.dart               Groq API key (DO NOT COMMIT to public repos)
 │   │
-│   └── modules/                One folder per person — this is where each of
-│       │                       you actually works, day to day.
+│   ├── theme/
+│   │   └── tokens.dart           Design tokens: colours, shared widgets (AppCard, SectionLabel)
+│   │
+│   └── modules/
+│       ├── auth/                 Role selection + Supabase consumer auth
+│       │   ├── screens/
+│       │   │   └── landing_screen.dart
+│       │   └── state/
+│       │       └── auth_state.dart       (RoleState provider)
 │       │
-│       ├── leakage/           📁 Module 3 — Water Leakage Detection → Worker X opens THIS folder
-│       │   ├── data/          Supabase repository (CRUD against the cloud tables)
-│       │   ├── models/        Alert, Report, Reading — plain data classes
-│       │   ├── services/      Detection engine, NRW analysis, baseline, explainer, simulation
-│       │   ├── state/         AppState — the module's single source of truth (Provider)
-│       │   └── screens/       UI screens for this module
+│       ├── dataset/              Module 1 — Equipment Management
+│       │   ├── data/             CSV parsing & dataset repository
+│       │   ├── models/           Dataset, Node, Equipment
+│       │   ├── screens/          dashboard_screen.dart, node_form_screen.dart, equipment_detail_screen.dart
+│       │   ├── services/         Anomaly detection engine
+│       │   └── state/            DatasetState provider
 │       │
-│       ├── dataset/           📁 Module 1 → its owner opens THIS folder (create on first commit)
-│       ├── usage/             📁 Module 2 → its owner opens THIS folder (create on first commit)
-│       └── electricity/       📁 Module 4 → its owner opens THIS folder (create on first commit)
+│       ├── usage/                Module 2 — Customer Experience
+│       │   └── screens/
+│       │       ├── customer_home_screen.dart    Home: usage overview, AI summary card, pending review banner
+│       │       ├── compare_usage_screen.dart    Water/electricity monthly history + daily bar chart
+│       │       ├── report_problem_screen.dart   Profile + Report a Problem flow
+│       │       └── my_reports_screen.dart       Resolved repairs list + star/tag/comment rating sheet
+│       │
+│       ├── leakage/              Module 3 — Water Leakage Detection
+│       │   ├── data/
+│       │   │   └── leakage_repository.dart      Supabase CRUD: alerts, reports, readings, reviews, summaries
+│       │   ├── models/
+│       │   │   ├── alert.dart
+│       │   │   ├── report.dart
+│       │   │   ├── reading.dart
+│       │   │   ├── service_review.dart          Customer repair rating (stars + tags + comment)
+│       │   │   └── ai_summary.dart              AI-generated service quality summary
+│       │   ├── screens/          home_screen.dart, alert_queue_screen.dart, alert_detail_screen.dart,
+│       │   │                     report_history_screen.dart, network_error.dart
+│       │   ├── services/         baseline_service, nrw_service, simulation_service, explainer,
+│       │   │                     electricity_loss_service
+│       │   └── state/
+│       │       └── app_state.dart               Central Provider: alerts, reports, reviews, AI summary
+│       │
+│       ├── electricity/          Module 4 — Electricity Anomaly Detection
+│       │   ├── models/           ElectricityRecord
+│       │   ├── screens/          electricity dashboard
+│       │   └── services/         ElectricityDataService
+│       │
+│       └── admin/                Admin-only screens
+│           └── screens/
+│               ├── oversight_screen.dart         Alerts + reports oversight (tabs)
+│               ├── admin_alert_detail_screen.dart
+│               ├── abnormal_production_screen.dart
+│               └── review_management_screen.dart  All reviews + ✨ Generate AI Insights button
 │
-├── test/                      Widget/unit tests
-├── pubspec.yaml                ⚠️ SHARED — dependency list + asset registration
-└── README.md                   This file
+├── pubspec.yaml                  Shared dependencies
+└── README.md                     This file
 ```
 
-**The rule that keeps four people from colliding:** everyone lives inside
-their own `lib/modules/<name>/` folder and stays out of everyone else's.
-Think of it like four people each having their own room in the same house —
-you can decorate your room however you like without asking anyone, but the
-front door and the shared hallway (`main.dart`, `pubspec.yaml`, `assets/`)
-affect everybody, so those need a quick heads-up in the team chat before you
-change them. See Conflict hotspots below for exactly how to handle that.
+---
 
-### What does NOT get uploaded to GitHub
+## Feature: AI-Powered Service Reviews
 
-Flutter/Android generate a lot of throwaway files. `.gitignore` already
-excludes them — nobody needs to think about this, but for reference:
+Customers rate completed repairs (1–5 stars + tags + comment). Admins click
+"✨ Generate AI Insights" to send all reviews to the Groq API (Llama 3 8B),
+which returns a structured summary (pros, cons, overall assessment) stored in
+Supabase and displayed to both customers and admins.
 
-| Ignored | Why |
+### Review tags
+
+| Positive | Negative |
 |---|---|
-| `build/` | Compiled output, regenerated by `flutter pub get` / `flutter run` |
-| `.dart_tool/`, `.flutter-plugins-dependencies` | Local tool cache |
-| `.idea/`, `*.iml` | Android Studio project settings (personal, not shared) |
-| `.DS_Store` | macOS folder metadata |
+| Fast Response | Still Leaking |
+| Perfectly Fixed | Slow Response |
+| Great Attitude | Overcharged |
+| Professional | Unprofessional |
+| Thorough Check | Poor Fix |
 
-After cloning, run `flutter pub get` once — it rebuilds everything ignored.
+### Supabase tables required
 
-## Data ownership rule
+Run this SQL once in Supabase → SQL Editor:
 
-Government CSVs under `assets/` are **read-only reference data**. No module
-should ever rewrite them at runtime — investigating or resolving an alert
-changes the alert/report records in Supabase, never the source dataset.
-Re-importing a newer government dataset version is Module 1's job (dataset
-versioning), not something the other modules do.
+```sql
+CREATE TABLE service_reviews (
+  id             SERIAL PRIMARY KEY,
+  alert_id       INTEGER,
+  consumer_email TEXT NOT NULL,
+  stars          INTEGER NOT NULL CHECK (stars BETWEEN 1 AND 5),
+  tags           TEXT[] DEFAULT '{}',
+  comment        TEXT DEFAULT '',
+  created_at     TIMESTAMPTZ DEFAULT NOW()
+);
 
-## Cloud database (Supabase) — Module 3
+CREATE TABLE ai_summaries (
+  id             SERIAL PRIMARY KEY,
+  summary_text   TEXT NOT NULL,
+  pros           TEXT[] DEFAULT '{}',
+  cons           TEXT[] DEFAULT '{}',
+  review_count   INTEGER NOT NULL DEFAULT 0,
+  generated_at   TIMESTAMPTZ DEFAULT NOW()
+);
+```
 
-Module 3's operational data (`readings`, `alerts`, `reports`) lives in a
-shared Supabase (Postgres) project, not on the device. The government CSVs
-and detection logic stay local and bundled — only the data that needs to be
-seen across devices/workers moves to the cloud.
+### Groq API key
 
-### Two different things, easy to mix up
+1. Register free at [console.groq.com](https://console.groq.com).
+2. Copy the key (`gsk_xxx...`).
+3. Paste it into `lib/config.dart`:
+   ```dart
+   static const String apiKey = 'gsk_your_key_here';
+   ```
 
-| | Who needs it | What it's for |
+---
+
+## Cloud database (Supabase)
+
+Module 3 operational data (`alerts`, `readings`, `reports`) and the review
+system (`service_reviews`, `ai_summaries`) live in a shared Supabase
+(Postgres) project.
+
+### Tables
+
+| Table | Module | Description |
 |---|---|---|
-| **Running the app** | Everyone, automatically | The app connects using a public anon key already in the code. Clone the repo, run the app — you're on the same shared database as everyone else. No login, no setup. |
-| **Managing the database via Claude Code / MCP** | Only if you want direct query/schema access | Requires your own Supabase login *and* being invited as a member of the project (see below). |
+| `alerts` | 3 | NRW and electricity anomaly alerts |
+| `readings` | 3 | Household water readings |
+| `reports` | 3 | Worker field reports |
+| `service_reviews` | 2 | Customer repair ratings |
+| `ai_summaries` | 2 | AI-generated review summaries |
 
-### If you just want to run the app
+### Running the app
 
-Nothing to do — `flutter pub get` pulls in `supabase_flutter`, and the app
-connects automatically. You'll see the same alerts/reports your teammates
-create, in real time across devices, because it's one shared cloud
-database instead of a private file on each phone.
-
-### If you want Claude Code to manage the Supabase project directly
-
-1. Ask the project owner to invite you: Supabase dashboard → project →
-   **Project Settings → Team** → **Invite member** (your email).
-2. Accept the invite.
-3. In a plain terminal (not the IDE extension): `cd` into the repo, run
-   `claude`, then `/mcp` → select **supabase** → **Authenticate** → log in
-   via the browser popup.
-4. Restart your Claude Code session once — a session that was already
-   running before you authenticate won't pick up the newly connected
-   server.
+Nothing to configure — the app connects automatically using the public anon
+key already embedded in `main.dart`. Run `flutter pub get` then `flutter run`.
 
 ### Security note
 
-Row Level Security (RLS) is enabled on all three tables with permissive
-policies, since the app currently simulates a single "Worker X" persona
-with no real login — there's no per-user identity yet to restrict by. This
-is a deliberate, documented simplification (see the Supabase migration
-design spec under `docs/superpowers/specs/`), not an oversight. RLS should
-never be disabled outright, and the anon key is the only key that belongs
-in app code — never commit a Supabase `service_role` key anywhere.
+Row Level Security (RLS) is enabled on all tables. The anon key is the only
+key that belongs in app code. Never commit a Supabase `service_role` key.
+`lib/config.dart` (Groq key) should be added to `.gitignore` before pushing
+to any public repository.
+
+---
+
+## Dependencies
+
+```yaml
+provider: ^6.1.5        # State management
+csv: ^6.0.0             # CSV parsing
+fl_chart: ^1.2.0        # Line/bar charts
+supabase_flutter: ^2.9.0 # Cloud backend + auth
+intl: ^0.20.2           # Date/number formatting
+uuid: ^4.5.3            # Unique IDs
+lucide_icons: ^0.257.0  # Water droplet, server crash icons
+http: ^1.2.0            # Groq API calls
+```
+
+---
+
+## Setup
+
+```bash
+# 1. Clone and install
+git clone <repo-url>
+cd Mobile-Assignmnet
+flutter pub get
+
+# 2. Add Groq key to lib/config.dart
+
+# 3. Ask Supabase project owner to run the two CREATE TABLE statements above
+
+# 4. Run
+flutter run
+```
 
 ---
 
 ## Git workflow (GitHub Desktop)
 
-This team is new to GitHub — follow this exactly and branches merge cleanly.
+### Every work session
 
-### One-time setup (per person)
+1. **Sync main** — Branch dropdown → `main` → Fetch origin → Pull origin
+2. **New branch** — `yourname-moduleX` (e.g. `alice-module1`)
+3. **Work** in your own `lib/modules/<name>/` folder only
+4. **Commit often** — small, specific messages (e.g. `Add NRW detection engine`)
+5. **Push** — Push origin
+6. **Pull Request** — Create PR on GitHub → teammate reviews → merge
+7. **Everyone syncs** — Pull origin on `main`
 
-1. Accept the repo invite (check email / GitHub notifications bell).
-2. GitHub Desktop → **File → Clone Repository** → select `mysumber` → choose
-   a local folder → **Clone**.
-3. Open the folder in Android Studio, then in a terminal run:
-   ```
-   flutter pub get
-   ```
+### Conflict hotspots
 
-**Why this step is required — and why it's not skippable:**
-`.gitignore` deliberately keeps a bunch of folders (`build/`, `.dart_tool/`,
-etc.) out of GitHub, because they're not source code — they're generated
-output that Flutter builds from `pubspec.yaml` and your Dart files. When you
-clone the repo, none of that generated stuff exists yet on your machine, so
-the project won't run. `flutter pub get` reads `pubspec.yaml`, downloads
-every package the app depends on (sqflite, provider, csv, etc.), and
-recreates all those missing folders locally. Nobody commits them because
-they're not "your work" — they're just derived from `pubspec.yaml`, the same
-way a compiled `.apk` is derived from your code. Run it once after cloning,
-and again any time you pull changes that touched `pubspec.yaml`.
+Conflicts only happen when two people edit the **same lines** of a shared file.
+The two files to watch:
 
-### Every work session — the loop everyone repeats
-
-**1. Sync `main` before starting anything new**
-- Branch dropdown (top left) → select `main`
-- Click **Fetch origin**, then **Pull origin**
-- Do this every time, before creating a new branch. Skipping this is the
-  #1 cause of painful merges.
-
-**2. Create your own branch**
-- Branch dropdown → **New Branch**
-- Name it `yourname-moduleX`, e.g. `alice-module1`, `workerx-module3`
-- Work only inside your own `lib/modules/<name>/` folder on this branch.
-
-**3. Commit as you go**
-- Edit files in Android Studio as normal.
-- In GitHub Desktop, the left panel lists changed files with a diff on the
-  right.
-- Write a short, specific message (e.g. `Add NRW detection engine`) →
-  **Commit to yourname-moduleX**.
-- Commit small and often — after each working piece, not once at the end.
-
-**4. Push your branch**
-- Click **Push origin** (top bar). Your commits are now on GitHub, but not
-  yet part of `main`.
-
-**5. Open a Pull Request (PR)**
-- GitHub Desktop shows a **Create Pull Request** banner → click it (opens
-  github.com) → add a short description → **Create pull request**.
-- This is a request: "please review and merge my branch into `main`."
-
-**6. Before merging, sync with `main`**
-- If GitHub shows **"This branch is out-of-date with the base branch"**,
-  click **Update branch** first. This pulls the latest `main` into your
-  branch so you catch any conflict yourself, calmly, before it affects
-  anyone else.
-
-**7. Review and merge**
-- A teammate (or you, for your own module) reviews the PR diff on
-  github.com.
-- If it looks good → **Merge pull request** → **Confirm merge** → optionally
-  **Delete branch**.
-
-**8. Everyone syncs back up**
-- Everyone: switch to `main` → **Pull origin** — now everyone has the
-  merged work.
-- Repeat the whole loop for the next piece of work.
-
-### Why unmerged work never leaks into `main`
-
-`main` and a feature branch are separate histories. Pulling `main` only
-updates whatever you currently have checked out — a teammate's pushed but
-unmerged branch does **not** appear on `main` until its PR is actually
-merged. Fetching downloads information about every branch (so it appears in
-the branch dropdown), but your checked-out branch's content only changes
-when you pull *that* branch.
-
-### Conflict hotspots and how they're handled
-
-Since each person owns a separate module folder, real conflicts are rare —
-git merges different files (and even different lines of the same file)
-automatically with no human input needed. Conflicts only happen when two
-people edit the **same lines of the same file**. The two shared files to
-watch:
-
-- **`pubspec.yaml`** — if you need to add a dependency, add your line, push
-  quickly, and let the team know. Don't leave it uncommitted for days.
-- **`lib/main.dart`** — only touched when wiring a new module's provider
-  into the app. Coordinate with the team before editing it.
-
-If GitHub Desktop reports a conflict:
-1. It lists the conflicting file(s).
-2. Open the file in Android Studio — conflicting sections look like:
-   ```
-   <<<<<<< HEAD
-   (the version already in main)
-   =======
-   (your branch's version)
-   >>>>>>> yourname-moduleX
-   ```
-3. Edit the file to keep the correct combined result, delete the
-   `<<<<<<<` / `=======` / `>>>>>>>` marker lines.
-4. Mark the file resolved in GitHub Desktop → commit the merge.
+- **`pubspec.yaml`** — add your dependency, commit fast, tell the team
+- **`lib/main.dart`** — coordinate before editing (new module wiring)
 
 ### Quick reference
 
-| I want to... | Do this in GitHub Desktop |
+| Goal | Action |
 |---|---|
-| Start work for the day | Switch to `main` → Fetch origin → Pull origin |
-| Begin a new task | New Branch → name it `yourname-moduleX` |
-| Save my progress | Write a message → Commit |
-| Share it with the team | Push origin |
-| Get it into `main` | Create Pull Request → teammate reviews → merge |
-| Get others' merged work | Switch to `main` → Pull origin |
-| Catch conflicts early | Update branch (before merging your PR) |
+| Start work | `main` → Fetch → Pull |
+| New task | New Branch → `yourname-moduleX` |
+| Save | Commit with message |
+| Share | Push origin |
+| Merge to main | Create PR → review → merge |
+| Get others' work | `main` → Pull |
 
-### Assignment submission note
+---
 
-The final submission requires **all AI-use disclosed** (Appendix A) and
-**all comments removed from the codebase** before the final ZIP — do this as
-a last pass right before packaging, not during development.
+## Submission checklist
 
-## Module 4 Implementation Progress
-
-**Owner:** Chun Jie Tan (Assigned)
-
-### 1. Unified Dataset Engine
-- Updated the backend state management (`dataset_state.dart`) to read and parse **all 4 actual CSV datasets** simultaneously: `water_production.csv`, `water_consumption.csv`, `electricity_supply.csv`, and `electricity_consumption.csv`.
-- Built the engine to normalize and aggregate dataset values by state dynamically.
-
-### 2. Dual-Bar Variance Chart
-- Upgraded the previous single-bar chart into a **Double-Bar comparison chart** on the main dashboard (`dashboard_screen.dart`).
-- Mapped state usage dynamically, displaying two side-by-side bars (Supply vs. Billed Consumption). 
-- Implemented visual gap analysis to map out utility loss or theft.
-
-### 3. Theft & Leakage Detection Engine
-- Developed a dynamic **Theft & Leakage Detection** UI component.
-- The system mathematically calculates `Supply - Billed Consumption` for every single state.
-- Highlights the exact state with the highest **Water Leakage** (lost liters) and the highest **Electricity Theft/Loss** (discrepant kW) actively on the dashboard.
-
-### 4. Electricity Anomaly Alignment
-- Updated the anomaly parsing logic inside `ElectricityDataService` to properly handle and parse the new dataset schema (`state, date, sector, value`).
-- Ensured total supply and total consumption correctly aggregate across all states by date to track Z-score anomalies effectively.
+- [ ] All AI use disclosed (Appendix A)
+- [ ] All comments removed from code
+- [ ] All modules merged to `main` and running
+- [ ] `flutter run` launches without errors on emulator
+- [ ] Supabase tables created (`service_reviews`, `ai_summaries`)
+- [ ] Groq API key set in `lib/config.dart`
+- [ ] No `service_role` key committed anywhere
+- [ ] `.gitignore` up to date

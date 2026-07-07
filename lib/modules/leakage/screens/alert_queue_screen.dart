@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 
+import '../../../theme/tokens.dart';
+import '../../auth/state/auth_state.dart';
 import '../models/alert.dart';
 import '../state/app_state.dart';
 import 'alert_detail_screen.dart';
@@ -19,7 +21,7 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
     with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
   String _severity = 'all';
-  String _status = 'all';
+  String _selectedState = 'all';
   late final TabController _tabController;
   int _lastIndex = 0;
 
@@ -36,7 +38,7 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
     setState(() {
       _search.clear();
       _severity = 'all';
-      _status = 'all';
+      _selectedState = 'all';
     });
   }
 
@@ -48,49 +50,92 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
     super.dispose();
   }
 
+  bool get _isWater => widget.utility == Utility.water;
+
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final query = _search.text.trim().toLowerCase();
-    final isWater = widget.utility == Utility.water;
-    final color = isWater ? Colors.blue.shade700 : Colors.amber.shade700;
-    final title = isWater ? 'Water Alerts' : 'Electricity Alerts';
+
+    final unresolvedAll = app.unresolvedFor(widget.utility);
+    final resolvedAll = app.resolvedFor(widget.utility);
+
+    final allStates = {
+      ...unresolvedAll.map((a) => a.state),
+      ...resolvedAll.map((a) => a.state),
+    }.toList()..sort();
 
     List<Alert> filter(List<Alert> source) {
       return source.where((a) {
-        if (query.isNotEmpty && !a.state.toLowerCase().contains(query)) {
+        if (query.isNotEmpty &&
+            !a.state.toLowerCase().contains(query) &&
+            !(a.householdId ?? '').toLowerCase().contains(query)) {
           return false;
         }
         if (_severity != 'all' && a.severity != _severity) return false;
-        if (_status != 'all' && a.status != _status) return false;
+        if (_selectedState != 'all' && a.state != _selectedState) return false;
         return true;
       }).toList();
     }
 
-    final unresolvedAll = app.unresolvedFor(widget.utility);
-    final resolvedAll = app.resolvedFor(widget.utility);
     final unresolved = filter(unresolvedAll);
     final resolved = filter(resolvedAll);
 
+    final title = _isWater ? 'Water Alerts' : 'Electricity Alerts';
+
     return Scaffold(
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        title: Text(title),
-        backgroundColor: color,
+        backgroundColor: AppColors.workerPrimary,
         foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          indicatorColor: Colors.white,
-          tabs: [
-            Tab(text: 'Unresolved · ${unresolvedAll.length}'),
-            Tab(text: 'Resolved · ${resolvedAll.length}'),
-          ],
+        leading: const BackButton(),
+        titleSpacing: 0,
+        title: const Text(
+          'mySumber · WORKER',
+          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () => context.read<RoleState>().logout(),
+            icon: const Icon(Icons.logout, color: Colors.white, size: 16),
+            label: const Text('Logout',
+                style: TextStyle(color: Colors.white, fontSize: 13)),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(80),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TabBar(
+                controller: _tabController,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.white60,
+                indicatorColor: Colors.white,
+                indicatorWeight: 3,
+                tabs: [
+                  Tab(text: 'Unresolved  ${unresolvedAll.length}'),
+                  Tab(text: 'Resolved  ${resolvedAll.length}'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
-          _filters(app),
+          _filters(allStates),
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -105,20 +150,33 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
     );
   }
 
-  Widget _filters(AppState app) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+  Widget _filters(List<String> states) {
+    return Container(
+      color: AppColors.surface,
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
       child: Column(
         children: [
           TextField(
             controller: _search,
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
-              hintText: 'Search by state',
-              prefixIcon: const Icon(Icons.search),
+              hintText: 'Search by location or code',
+              hintStyle: const TextStyle(color: AppColors.textTertiary),
+              prefixIcon: const Icon(Icons.search,
+                  color: AppColors.textTertiary, size: 20),
               isDense: true,
-              border:
-                  OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider)),
+              enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider)),
+              focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide:
+                      const BorderSide(color: AppColors.workerPrimary)),
             ),
           ),
           const SizedBox(height: 8),
@@ -134,13 +192,15 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: _dropdown('Status', _status, {
-                  'all': 'All Status',
-                  AlertStatus.pending: 'Pending',
-                  AlertStatus.investigating: 'Investigating',
-                  AlertStatus.notFixed: 'Not Fixed',
-                  AlertStatus.resolved: 'Resolved',
-                }, (v) => setState(() => _status = v)),
+                child: _dropdown(
+                  'State',
+                  _selectedState,
+                  {
+                    'all': 'All States',
+                    for (final s in states) s: s,
+                  },
+                  (v) => setState(() => _selectedState = v),
+                ),
               ),
             ],
           ),
@@ -152,12 +212,18 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
   Widget _dropdown(String hint, String value, Map<String, String> options,
       ValueChanged<String> onChanged) {
     return DropdownButtonFormField<String>(
-      initialValue: value,
+      value: value,
       isDense: true,
       decoration: InputDecoration(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(24)),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.divider)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: const BorderSide(color: AppColors.divider)),
       ),
       items: options.entries
           .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
@@ -168,10 +234,13 @@ class _AlertQueueScreenState extends State<AlertQueueScreen>
 
   Widget _list(List<Alert> alerts, String empty) {
     if (alerts.isEmpty) {
-      return Center(child: Text(empty));
+      return Center(
+        child: Text(empty,
+            style: const TextStyle(color: AppColors.textSecondary)),
+      );
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
       itemCount: alerts.length,
       itemBuilder: (context, index) => _AlertCard(alert: alerts[index]),
     );
@@ -182,17 +251,119 @@ class _AlertCard extends StatelessWidget {
   final Alert alert;
   const _AlertCard({required this.alert});
 
-  String _metricUnit() {
-    switch (alert.alertType) {
-      case AlertType.nrwHotspot:
-        return 'of treated water lost';
-      case AlertType.electricityHotspot:
-        return 'of supply unaccounted for';
-      case AlertType.electricityTampering:
-        return 'national loss';
-      default:
-        return 'of the state average';
+  @override
+  Widget build(BuildContext context) {
+    final sev = alert.severity;
+    final sevColor = severityColor(sev);
+    final sevLabel = Severity.label(sev);
+
+    Color sevBg;
+    if (sev == Severity.high) {
+      sevBg = AppColors.criticalSurface;
+    } else if (sev == Severity.medium) {
+      sevBg = AppColors.warningSurface;
+    } else {
+      sevBg = AppColors.workerSurface;
     }
+
+    final typeLabel = _typeLabel();
+    final date = DateFormat('d MMM').format(alert.detectedAt);
+
+    final usesLossPct = alert.lossPct != null;
+    final metricText = usesLossPct
+        ? '${alert.lossPct!.toStringAsFixed(1)}% of supply unaccounted'
+        : '${alert.ratio.toStringAsFixed(1)}x of state avg';
+
+    return GestureDetector(
+      onTap: () => Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => AlertDetailScreen(alertId: alert.id!))),
+      child: Stack(
+        children: [
+          Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0F000000),
+                  blurRadius: 10,
+                  offset: Offset(0, 3),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.fromLTRB(18, 14, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        alert.title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: sevBg,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        sevLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: sevColor,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '$typeLabel · Flagged $date',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  metricText,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: sevColor,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 10,
+            child: Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: sevColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(14),
+                  bottomLeft: Radius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   String _typeLabel() {
@@ -206,105 +377,5 @@ class _AlertCard extends StatelessWidget {
       default:
         return 'Household';
     }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final color = severityColor(alert.severity);
-    final usesLossPct = alert.lossPct != null;
-    final metric = usesLossPct
-        ? '${alert.lossPct!.toStringAsFixed(1)}%'
-        : '${alert.ratio.toStringAsFixed(1)}×';
-    final unit = _metricUnit();
-    final typeLabel = _typeLabel();
-    final date = DateFormat('d MMM').format(alert.detectedAt);
-    final time = alert.dataYear != null
-        ? 'Flagged $date · ${alert.dataYear} data'
-        : 'Flagged $date';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => AlertDetailScreen(alertId: alert.id!))),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                        alert.severity == Severity.high
-                            ? Icons.warning_amber
-                            : Icons.error_outline,
-                        color: color),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(alert.title,
-                            style: const TextStyle(
-                                fontSize: 15, fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 2),
-                        Row(children: [
-                          Icon(
-                              alert.alertType == AlertType.household
-                                  ? Icons.home_outlined
-                                  : alert.isElectricity
-                                      ? Icons.bolt_outlined
-                                      : Icons.place_outlined,
-                              size: 13, color: Colors.black45),
-                          const SizedBox(width: 4),
-                          Text('$typeLabel · ${Severity.label(alert.severity)}',
-                              style: const TextStyle(
-                                  fontSize: 12, color: Colors.black54)),
-                        ]),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: Colors.black38),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.baseline,
-                textBaseline: TextBaseline.alphabetic,
-                children: [
-                  Text(metric,
-                      style: const TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.w600)),
-                  const SizedBox(width: 7),
-                  Text(unit,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.black54)),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  pill(AlertStatus.label(alert.status),
-                      statusColor(alert.status)),
-                  const Spacer(),
-                  Text(time,
-                      style:
-                          const TextStyle(fontSize: 12, color: Colors.black45)),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

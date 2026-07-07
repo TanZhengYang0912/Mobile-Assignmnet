@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 
-import '../../leakage/state/app_state.dart';
-import '../services/electricity_baseline_service.dart';
+import '../../../theme/tokens.dart';
 
 class CompareUsageScreen extends StatefulWidget {
   const CompareUsageScreen({super.key});
@@ -11,195 +9,256 @@ class CompareUsageScreen extends StatefulWidget {
   State<CompareUsageScreen> createState() => _CompareUsageScreenState();
 }
 
-class _CompareUsageScreenState extends State<CompareUsageScreen> {
-  final _electricityBaseline = ElectricityBaselineService();
-  final _waterController = TextEditingController();
-  final _electricityController = TextEditingController();
+class _CompareUsageScreenState extends State<CompareUsageScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tab;
 
-  bool _loadingBaseline = true;
-  String? _selectedState;
-  int _householdSize = 4;
+  final _waterDaily = const [
+    14.2, 15.1, 13.6, 16.4, 14.8, 15.9, 17.1,
+    14.3, 15.5, 14.7, 16.0, 17.4, 15.2, 16.8,
+  ];
+  final _elecDaily = const [
+    9.8, 11.4, 10.2, 12.8, 10.5, 11.0, 13.2,
+    10.1, 11.9, 10.8, 12.4, 13.5, 10.9, 12.1,
+  ];
 
-  _Comparison? _waterResult;
-  _Comparison? _electricityResult;
+  final _waterMonthly = const [
+    _MonthUsage('Jul 2025', 14.8, current: true),
+    _MonthUsage('Jun 2025', 15.3),
+    _MonthUsage('May 2025', 15.4),
+    _MonthUsage('Apr 2025', 15.1),
+    _MonthUsage('Mar 2025', 15.8),
+    _MonthUsage('Feb 2025', 16.2),
+  ];
+  final _elecMonthly = const [
+    _MonthUsage('Jul 2025', 10.8, current: true),
+    _MonthUsage('Jun 2025', 11.4),
+    _MonthUsage('May 2025', 11.2),
+    _MonthUsage('Apr 2025', 11.5),
+    _MonthUsage('Mar 2025', 11.9),
+    _MonthUsage('Feb 2025', 12.4),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _electricityBaseline.load().then((_) {
-      if (mounted) setState(() => _loadingBaseline = false);
+    _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(() {
+      if (mounted) setState(() {});
     });
   }
 
   @override
   void dispose() {
-    _waterController.dispose();
-    _electricityController.dispose();
+    _tab.dispose();
     super.dispose();
   }
 
-  void _compare() {
-    final state = _selectedState;
-    if (state == null) return;
-
-    final app = context.read<AppState>();
-    final waterInput = double.tryParse(_waterController.text);
-    final electricityInput = double.tryParse(_electricityController.text);
-
-    setState(() {
-      _waterResult = waterInput == null
-          ? null
-          : _Comparison(
-              actual: waterInput,
-              expected: app.baseline
-                  .expectedHouseholdLPerDay(state, _householdSize),
-              unit: 'L/day',
-            );
-      _electricityResult = electricityInput == null
-          ? null
-          : _Comparison(
-              actual: electricityInput,
-              expected: _electricityBaseline.expectedHouseholdKwhPerDay(
-                  state, _householdSize),
-              unit: 'kWh/day',
-            );
-    });
-  }
+  bool get _isWater => _tab.index == 0;
 
   @override
   Widget build(BuildContext context) {
-    if (_loadingBaseline) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
-
-    final app = context.watch<AppState>();
-    final states = app.baseline.states;
-    _selectedState ??= states.isNotEmpty ? states.first : null;
+    final currentDaily = _isWater ? _waterDaily : _elecDaily;
+    final currentMonthly = _isWater ? _waterMonthly : _elecMonthly;
+    final unit = _isWater ? 'm³' : 'kWh';
+    final accent =
+        _isWater ? AppColors.waterAccent : AppColors.electricityAccent;
+    final surface =
+        _isWater ? AppColors.waterSurface : AppColors.electricitySurface;
+    final current = currentMonthly.first;
+    final prev = currentMonthly[1];
+    final delta = ((current.value - prev.value) / prev.value * 100);
+    final avg =
+        currentMonthly.map((m) => m.value).reduce((a, b) => a + b) /
+            currentMonthly.length;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Compare My Usage'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-      ),
+      backgroundColor: AppColors.canvas,
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.zero,
         children: [
-          const Text('See how your household compares to your state\'s '
-              'average water and electricity usage.',
-              style: TextStyle(fontSize: 13, color: Colors.black54)),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedState,
-            decoration: const InputDecoration(
-              labelText: 'State',
-              border: OutlineInputBorder(),
-            ),
-            items: states
-                .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                .toList(),
-            onChanged: (v) => setState(() => _selectedState = v),
+          _header(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+            child: _utilityTabs(),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              const Text('Household Size: '),
-              IconButton(
-                icon: const Icon(Icons.remove_circle_outline),
-                onPressed: _householdSize > 1
-                    ? () => setState(() => _householdSize--)
-                    : null,
-              ),
-              Text('$_householdSize',
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              IconButton(
-                icon: const Icon(Icons.add_circle_outline),
-                onPressed: () => setState(() => _householdSize++),
-              ),
-            ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            child: _summaryCard(current, delta, avg, unit, accent, surface),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _waterController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Water usage (L/day)',
-              prefixIcon: Icon(Icons.water_drop_outlined),
-              border: OutlineInputBorder(),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: _dailyChart(currentDaily, unit, accent, surface),
           ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _electricityController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Electricity usage (kWh/day)',
-              prefixIcon: Icon(Icons.bolt_outlined),
-              border: OutlineInputBorder(),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 12),
+            child: _monthlyHistory(currentMonthly, unit, accent, surface),
           ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            style:
-                FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
-            onPressed: _selectedState == null ? null : _compare,
-            icon: const Icon(Icons.compare_arrows),
-            label: const Text('Compare'),
-          ),
-          if (_waterResult != null) ...[
-            const SizedBox(height: 20),
-            _resultCard('Water', Icons.water_drop, Colors.blue, _waterResult!),
-          ],
-          if (_electricityResult != null) ...[
-            const SizedBox(height: 12),
-            _resultCard(
-                'Electricity', Icons.bolt, Colors.amber, _electricityResult!),
-          ],
+          const SizedBox(height: 24),
         ],
       ),
     );
   }
 
-  Widget _resultCard(
-      String label, IconData icon, MaterialColor color, _Comparison result) {
-    final statusColor = result.isAboveNormal
-        ? Colors.red.shade600
-        : result.isBelowNormal
-            ? Colors.blue.shade600
-            : Colors.green.shade600;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _header(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.adminPrimary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
           children: [
-            Row(
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.bar_chart_outlined,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('mySumber · USAGE',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      )),
+                  SizedBox(height: 2),
+                  Text('My Usage',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      )),
+                ],
+              ),
+            ),
+            Stack(
+              clipBehavior: Clip.none,
               children: [
-                Icon(icon, color: color.shade700),
-                const SizedBox(width: 8),
-                Text(label,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold)),
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.notifications_outlined,
+                      color: Colors.white, size: 20),
+                ),
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.critical,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                          color: AppColors.adminPrimary, width: 1.5),
+                    ),
+                    child: const Text(
+                      '2',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _utilityTabs() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.divider),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _tabButton(
+              label: 'Water',
+              icon: Icons.water_drop_outlined,
+              selected: _isWater,
+              onTap: () => _tab.animateTo(0),
+              color: AppColors.waterAccent,
+            ),
+          ),
+          Expanded(
+            child: _tabButton(
+              label: 'Electricity',
+              icon: Icons.electric_bolt_outlined,
+              selected: !_isWater,
+              onTap: () => _tab.animateTo(1),
+              color: AppColors.electricityAccent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tabButton({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required VoidCallback onTap,
+    required Color color,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: selected ? AppColors.surface : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    color: Color(0x14000000),
+                    blurRadius: 8,
+                    offset: Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 16,
+                color: selected ? color : AppColors.textTertiary),
+            const SizedBox(width: 6),
             Text(
-                'You: ${result.actual.toStringAsFixed(1)} ${result.unit} · '
-                'State average: ${result.expected.toStringAsFixed(1)} ${result.unit}',
-                style: const TextStyle(fontSize: 13, color: Colors.black54)),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: statusColor.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: statusColor),
-              ),
-              child: Text(
-                '${result.statusLabel} (${result.ratio.toStringAsFixed(1)}x average)',
-                style: TextStyle(
-                    color: statusColor, fontWeight: FontWeight.w600),
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: selected ? color : AppColors.textSecondary,
               ),
             ),
           ],
@@ -207,22 +266,245 @@ class _CompareUsageScreenState extends State<CompareUsageScreen> {
       ),
     );
   }
+
+  Widget _summaryCard(_MonthUsage current, double delta, double avg,
+      String unit, Color accent, Color surface) {
+    final trendDown = delta < 0;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${current.label} · ${_isWater ? 'Water' : 'Electricity'} Usage',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.baseline,
+            textBaseline: TextBaseline.alphabetic,
+            children: [
+              Text(
+                current.value.toStringAsFixed(1),
+                style: const TextStyle(
+                  fontSize: 40,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(unit,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(trendDown ? Icons.trending_down : Icons.trending_up,
+                  size: 16,
+                  color: trendDown ? AppColors.success : AppColors.critical),
+              const SizedBox(width: 4),
+              Text(
+                '${delta.toStringAsFixed(1)}% compared to Jun',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: trendDown ? AppColors.success : AppColors.critical,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              const Text('Monthly average',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  )),
+              const Spacer(),
+              Text('${avg.toStringAsFixed(1)} $unit',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textPrimary,
+                    fontWeight: FontWeight.w700,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: (current.value / avg).clamp(0.0, 1.5) / 1.5,
+              minHeight: 8,
+              backgroundColor: surface,
+              valueColor: AlwaysStoppedAnimation<Color>(accent),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _dailyChart(
+      List<double> data, String unit, Color accent, Color surface) {
+    final maxV = data.reduce((a, b) => a > b ? a : b) * 1.15;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const SectionLabel('DAILY (JUL 2025)'),
+              Text('per day in $unit',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textTertiary,
+                  )),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 130,
+            child: LayoutBuilder(builder: (context, cs) {
+              final barWidth =
+                  (cs.maxWidth - (data.length - 1) * 4) / data.length;
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  for (int i = 0; i < data.length; i++) ...[
+                    Container(
+                      width: barWidth,
+                      height: (data[i] / maxV) * 130,
+                      decoration: BoxDecoration(
+                        color: accent.withValues(alpha: 0.55),
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(4),
+                          topRight: Radius.circular(4),
+                        ),
+                      ),
+                    ),
+                    if (i < data.length - 1) const SizedBox(width: 4),
+                  ],
+                ],
+              );
+            }),
+          ),
+          const SizedBox(height: 6),
+          Row(
+            children: [
+              for (int i = 0; i < data.length; i++) ...[
+                Expanded(
+                  child: Text(
+                    (i % 2 == 0) ? '${i + 1}' : '',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _monthlyHistory(
+      List<_MonthUsage> months, String unit, Color accent, Color surface) {
+    final maxV = months.map((m) => m.value).reduce((a, b) => a > b ? a : b);
+    final minV = months.map((m) => m.value).reduce((a, b) => a < b ? a : b);
+    final range = maxV - minV;
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: SectionLabel('MONTHLY HISTORY'),
+          ),
+          for (int i = 0; i < months.length; i++) ...[
+            if (i > 0) const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 80,
+                    child: Text(months[i].label,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        )),
+                  ),
+                  if (months[i].current) ...[
+                    const SizedBox(width: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.successSurface,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Current',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: range == 0
+                            ? 0.8
+                            : (0.3 + (months[i].value - minV) / range * 0.6)
+                                .clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: surface,
+                        valueColor: AlwaysStoppedAnimation<Color>(accent),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text('${months[i].value.toStringAsFixed(1)} $unit',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                      )),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
 }
 
-class _Comparison {
-  final double actual;
-  final double expected;
-  final String unit;
-
-  const _Comparison(
-      {required this.actual, required this.expected, required this.unit});
-
-  double get ratio => expected == 0 ? 0 : actual / expected;
-  bool get isAboveNormal => ratio > 1.3;
-  bool get isBelowNormal => ratio < 0.8;
-  String get statusLabel => isAboveNormal
-      ? 'Above normal'
-      : isBelowNormal
-          ? 'Below normal'
-          : 'Normal';
+class _MonthUsage {
+  final String label;
+  final double value;
+  final bool current;
+  const _MonthUsage(this.label, this.value, {this.current = false});
 }

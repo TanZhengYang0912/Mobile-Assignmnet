@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../../theme/tokens.dart';
+import '../../auth/state/auth_state.dart';
 import '../../leakage/screens/network_error.dart';
 import '../../leakage/services/simulation_service.dart';
 import '../../leakage/state/app_state.dart';
@@ -13,13 +15,380 @@ class ReportProblemScreen extends StatefulWidget {
 }
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
+  bool _pushNotifications = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final role = context.watch<RoleState>();
+    final email = role.email ?? '';
+    final displayName = email.isEmpty
+        ? 'Account Holder'
+        : email.split('@').first.replaceAll('.', ' ').replaceAllMapped(
+              RegExp(r'\b\w'),
+              (m) => m.group(0)!.toUpperCase(),
+            );
+    final initials = displayName
+        .split(' ')
+        .where((s) => s.isNotEmpty)
+        .take(2)
+        .map((s) => s[0].toUpperCase())
+        .join();
+
+    return Scaffold(
+      backgroundColor: AppColors.canvas,
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          _header(context),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+            child: _profileCard(displayName, email, initials),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: _detailsCard(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: _menuCard(),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+            child: FilledButton.icon(
+              onPressed: () => context.read<RoleState>().logout(),
+              icon: const Icon(Icons.logout, size: 18),
+              label: const Text('Sign Out'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                backgroundColor: const Color(0xFFFEF2F2),
+                foregroundColor: AppColors.critical,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                textStyle: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _header(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        color: AppColors.adminPrimary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.18),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.person_outline,
+                  color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('mySumber · PROFILE',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      )),
+                  SizedBox(height: 2),
+                  Text('My Account',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                      )),
+                ],
+              ),
+            ),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.notifications_outlined,
+                      color: Colors.white, size: 20),
+                ),
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 5, vertical: 1),
+                    decoration: BoxDecoration(
+                      color: AppColors.critical,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                          color: AppColors.adminPrimary, width: 1.5),
+                    ),
+                    child: const Text(
+                      '2',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _profileCard(String name, String email, String initials) {
+    return AppCard(
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.adminPrimary,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Center(
+              child: Text(
+                initials.isEmpty ? '·' : initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  email.isEmpty ? '—' : email,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                const Text(
+                  '+60 12-345 6789',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailsCard() {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          _detailRow(
+            icon: Icons.location_on_outlined,
+            label: 'Service Address',
+            value: 'No. 12, Jln Merdeka, Selangor',
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _detailRow(
+            icon: Icons.receipt_long_outlined,
+            label: 'Account Number',
+            value: 'ACC-2024-0847',
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _detailRow(
+            icon: Icons.credit_card_outlined,
+            label: 'Billing Plan',
+            value: 'Residential Standard',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _detailRow(
+      {required IconData icon, required String label, required String value}) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary)),
+                const SizedBox(height: 2),
+                Text(value,
+                    style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuCard() {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 12, 6),
+            child: Row(
+              children: [
+                const Icon(Icons.notifications_outlined,
+                    size: 20, color: AppColors.textSecondary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text('Push Notifications',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary)),
+                ),
+                Transform.scale(
+                  scale: 0.9,
+                  child: Switch(
+                    value: _pushNotifications,
+                    activeThumbColor: Colors.white,
+                    activeTrackColor: AppColors.adminPrimary,
+                    onChanged: (v) => setState(() => _pushNotifications = v),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _menuItem(
+            icon: Icons.flag_outlined,
+            label: 'Report a Problem',
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const _ReportFlowScreen())),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _menuItem(
+            icon: Icons.help_outline,
+            label: 'Help & Support',
+            onTap: () {},
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _menuItem(
+            icon: Icons.settings_outlined,
+            label: 'App Settings',
+            onTap: () {},
+            trailing: const Icon(Icons.chevron_right,
+                color: AppColors.textTertiary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Widget? trailing,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+        child: Row(
+          children: [
+            Icon(icon, size: 20, color: AppColors.textSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(label,
+                  style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary)),
+            ),
+            trailing ??
+                const Icon(Icons.chevron_right,
+                    color: AppColors.textTertiary),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dedicated flow for reporting a problem — moved off the profile screen so
+/// account details stay focused on identity.
+class _ReportFlowScreen extends StatefulWidget {
+  const _ReportFlowScreen();
+
+  @override
+  State<_ReportFlowScreen> createState() => _ReportFlowScreenState();
+}
+
+class _ReportFlowScreenState extends State<_ReportFlowScreen> {
   String _selectedState = 'Selangor';
+  LeakScenario? _pendingScenario;
 
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
+
     if (app.loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     final states = app.baseline.states;
@@ -29,55 +398,101 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     final perCapita = app.baseline.perCapitaLPerDay(_selectedState);
 
     return Scaffold(
+      backgroundColor: AppColors.canvas,
       appBar: AppBar(
-        title: const Text('Report A Problem'),
-        backgroundColor: Colors.blue.shade700,
+        title: const Text('Report a Problem'),
+        backgroundColor: AppColors.adminPrimary,
         foregroundColor: Colors.white,
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         children: [
-          const Text('Report A Household Water Problem',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 4),
-          const Text(
-              'Tell us what\'s happening with your water usage. We\'ll check '
-              'it against your state\'s average and send it to our team if '
-              'it looks abnormal.',
-              style: TextStyle(fontSize: 13, color: Colors.black54)),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Text('State: '),
-              DropdownButton<String>(
-                value: _selectedState,
-                onChanged: (s) =>
-                    setState(() => _selectedState = s ?? _selectedState),
-                items: states
-                    .map((s) => DropdownMenuItem(value: s, child: Text(s)))
-                    .toList(),
-              ),
-            ],
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionLabel('YOUR STATE'),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedState,
+                  isDense: true,
+                  decoration: const InputDecoration(
+                    labelText: 'State',
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(),
+                  ),
+                  items: states
+                      .map((s) => DropdownMenuItem(value: s, child: Text(s)))
+                      .toList(),
+                  onChanged: (s) => setState(
+                      () => _selectedState = s ?? _selectedState),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Average domestic use: ${perCapita.toStringAsFixed(0)} L/person/day (${app.baseline.latestYear})',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ),
-          Text(
-              'Average domestic use: ${perCapita.toStringAsFixed(0)} L/person/day '
-              '(${app.baseline.latestYear})',
-              style: const TextStyle(fontSize: 13, color: Colors.black54)),
-          const SizedBox(height: 16),
-          const Text('What Best Describes the Problem?',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: LeakScenario.values
-                .map((s) => OutlinedButton(
-                      onPressed: () => _submit(app, s),
-                      child: Text(s.label),
-                    ))
-                .toList(),
+          const SizedBox(height: 10),
+          AppCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SectionLabel('WHAT\'S HAPPENING'),
+                const SizedBox(height: 4),
+                const Text(
+                  'Describe what\'s happening — we\'ll check it against your state\'s average.',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: LeakScenario.values
+                      .map((s) => _scenarioChip(app, s))
+                      .toList(),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 24),
         ],
+      ),
+    );
+  }
+
+  Widget _scenarioChip(AppState app, LeakScenario scenario) {
+    final selected = _pendingScenario == scenario;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _pendingScenario = scenario);
+        _submit(app, scenario);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected
+              ? AppColors.adminPrimary
+              : AppColors.adminSurface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+              color: selected
+                  ? AppColors.adminPrimary
+                  : AppColors.adminPrimary.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          scenario.label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.adminPrimary,
+          ),
+        ),
       ),
     );
   }
@@ -86,19 +501,21 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     try {
       final outcome = await app.simulate(scenario, _selectedState);
       if (!mounted) return;
+      setState(() => _pendingScenario = null);
       final message = outcome.anomalyRaised
-          ? 'Thanks — we\'ve flagged this as ${outcome.result.signature} '
-              '(${outcome.result.severity}) and sent it to our team.'
-          : 'Your usage looks within the normal range '
-              '(${outcome.result.ratio.toStringAsFixed(1)}x average). No report needed.';
+          ? 'Thanks — flagged as ${outcome.result.signature} (${outcome.result.severity}) and sent to our team.'
+          : 'Your usage looks within the normal range (${outcome.result.ratio.toStringAsFixed(1)}x average). No report needed.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),
         backgroundColor: outcome.anomalyRaised
-            ? Colors.red.shade600
-            : Colors.green.shade600,
+            ? AppColors.critical
+            : AppColors.success,
       ));
     } catch (_) {
-      if (mounted) showNetworkErrorSnackBar(context);
+      if (mounted) {
+        setState(() => _pendingScenario = null);
+        showNetworkErrorSnackBar(context);
+      }
     }
   }
 }

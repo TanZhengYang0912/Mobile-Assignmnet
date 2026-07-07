@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'modules/admin/screens/abnormal_production_screen.dart';
-import 'modules/admin/screens/oversight_screen.dart';
+import 'theme/tokens.dart';
 
-import 'modules/auth/screens/login_screen.dart';
+import 'modules/admin/screens/oversight_screen.dart';
+import 'modules/admin/screens/review_management_screen.dart';
+
+import 'modules/auth/screens/landing_screen.dart';
 import 'modules/auth/state/auth_state.dart' show RoleState;
 
 import 'modules/leakage/data/leakage_repository.dart';
@@ -20,6 +22,7 @@ import 'modules/dataset/data/dataset_repository.dart';
 import 'modules/dataset/screens/dashboard_screen.dart';
 import 'modules/dataset/state/dataset_state.dart';
 
+import 'modules/usage/screens/customer_home_screen.dart';
 import 'modules/usage/screens/compare_usage_screen.dart';
 import 'modules/usage/screens/report_problem_screen.dart';
 
@@ -73,28 +76,63 @@ class MySumberApp extends StatelessWidget {
         title: 'mySumber',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
-          colorSchemeSeed: Colors.blue,
           useMaterial3: true,
-          scaffoldBackgroundColor: Colors.grey.shade50,
+          scaffoldBackgroundColor: AppColors.canvas,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: AppColors.adminPrimary,
+            surface: AppColors.canvas,
+          ),
+          fontFamily: 'Roboto',
           appBarTheme: const AppBarTheme(
             elevation: 0,
-            scrolledUnderElevation: 1,
+            scrolledUnderElevation: 0,
             centerTitle: false,
+            backgroundColor: Colors.transparent,
+            foregroundColor: AppColors.textPrimary,
           ),
           cardTheme: CardThemeData(
             elevation: 0,
             margin: const EdgeInsets.symmetric(vertical: 6),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: Colors.grey.shade200),
+              borderRadius: BorderRadius.circular(14),
             ),
+            color: AppColors.surface,
           ),
           filledButtonTheme: FilledButtonThemeData(
             style: FilledButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+          ),
+          outlinedButtonTheme: OutlinedButtonThemeData(
+            style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(46),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
+              side: const BorderSide(color: AppColors.divider),
+            ),
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.adminPrimary),
             ),
           ),
         ),
@@ -102,9 +140,8 @@ class MySumberApp extends StatelessWidget {
           builder: (BuildContext context, RoleState authState, Widget? _) {
             if (authState.isLoggedIn) {
               return AppShell(userRole: authState.userRole!);
-            } else {
-              return const LoginScreen();
             }
+            return const LandingScreen();
           },
         ),
       ),
@@ -123,10 +160,8 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   int _currentIndex = 0;
-
   late final List<Widget> _screens;
-  late final List<Color> _tabColors;
-  late final List<BottomNavigationBarItem> _navItems;
+  late final List<_NavItem> _navItems;
 
   @override
   void initState() {
@@ -137,105 +172,100 @@ class _AppShellState extends State<AppShell> {
   void _setupScreensByRole() {
     switch (widget.userRole) {
       case 'admin':
-        _screens = [
-          const DashboardScreen(), // Module 1: equipment
-          const AbnormalProductionScreen(), // generate abnormal-production alerts
-          const OversightScreen(), // oversight + alert gate + report hide
-        ];
-        _tabColors = [
-          Colors.teal.shade700,
-          Colors.red.shade700,
-          Colors.blue.shade700,
+        _screens = const [
+          DashboardScreen(),
+          OversightScreen(section: OversightSection.alerts),
+          OversightScreen(section: OversightSection.reports),
+          ReviewManagementScreen(),
         ];
         _navItems = const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Equipment',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.flag_outlined),
-            label: 'Alerts',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.visibility_outlined),
-            label: 'Oversight',
-          ),
+          _NavItem(icon: Icons.build_outlined, label: 'Equipment'),
+          _NavItem(icon: Icons.notifications_outlined, label: 'Alerts'),
+          _NavItem(icon: Icons.grid_view_outlined, label: 'Oversight'),
+          _NavItem(icon: Icons.star_outline, label: 'Reviews'),
         ];
         break;
       case 'worker':
-        _screens = [
-          const HomeScreen(utility: Utility.water),
-          const HomeScreen(utility: Utility.electricity),
+        _screens = const [
+          HomeScreen(utility: Utility.water),
+          HomeScreen(utility: Utility.electricity),
         ];
-        _tabColors = [Colors.blue.shade700, Colors.amber.shade700];
         _navItems = const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.report_problem),
-            label: 'Water',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.electric_meter),
-            label: 'Electricity',
-          ),
+          _NavItem(icon: Icons.water_drop_outlined, label: 'Water'),
+          _NavItem(icon: Icons.electric_bolt_outlined, label: 'Electricity'),
         ];
         break;
       default:
-        // Normal user
-        _screens = [
-          const CompareUsageScreen(),
-          const ReportProblemScreen(),
+        _screens = const [
+          CustomerHomeScreen(),
+          CompareUsageScreen(),
+          ReportProblemScreen(),
         ];
-        _tabColors = [Colors.blue.shade700, Colors.red.shade700];
         _navItems = const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.compare_arrows),
-            label: 'Compare',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.report_problem_outlined),
-            label: 'Report',
-          ),
+          _NavItem(icon: Icons.home_outlined, label: 'Home'),
+          _NavItem(icon: Icons.bar_chart_outlined, label: 'Usage'),
+          _NavItem(icon: Icons.person_outline, label: 'Profile'),
         ];
     }
   }
 
-  void _logout() {
-    context.read<RoleState>().logout();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final primary = rolePrimary(widget.userRole);
     return Scaffold(
-      appBar: AppBar(
-        title: Text('mySumber - ${widget.userRole.toUpperCase()}'),
-        backgroundColor: Colors.blue.shade700,
-        foregroundColor: Colors.white,
-        actions: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Center(
-              child: TextButton.icon(
-                onPressed: _logout,
-                icon: const Icon(Icons.logout, color: Colors.white),
-                label: const Text(
-                  'Logout',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      backgroundColor: AppColors.canvas,
       body: _screens[_currentIndex],
-      bottomNavigationBar: _navItems.length > 1
-          ? BottomNavigationBar(
-              type: BottomNavigationBarType.fixed,
-              currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
-              selectedItemColor: _tabColors[_currentIndex],
-              items: _navItems,
-            )
-          : null,
+      bottomNavigationBar: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(
+            top: BorderSide(color: AppColors.divider, width: 1),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(_navItems.length, (i) {
+              final item = _navItems[i];
+              final selected = i == _currentIndex;
+              return Expanded(
+                child: InkWell(
+                  onTap: () => setState(() => _currentIndex = i),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          item.icon,
+                          color: selected ? primary : AppColors.textTertiary,
+                          size: 24,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? primary : AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+      ),
     );
   }
+}
+
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem({required this.icon, required this.label});
 }
