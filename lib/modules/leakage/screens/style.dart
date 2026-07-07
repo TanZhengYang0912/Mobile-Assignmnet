@@ -27,6 +27,8 @@ Color statusColor(String status) {
       return Colors.red.shade600;
     case AlertStatus.dismissed:
       return Colors.grey;
+    case AlertStatus.faults:
+      return Colors.deepOrange.shade400;
     default:
       return Colors.blueGrey;
   }

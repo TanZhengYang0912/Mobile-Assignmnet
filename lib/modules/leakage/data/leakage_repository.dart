@@ -65,12 +65,27 @@ class LeakageRepository {
     return rows.map((row) => row['state'] as String).toSet();
   }
 
-  Future<List<Report>> reports() async {
+  Future<Set<String>> electricityAlertStates() async {
     final rows = await _client
-        .from('reports')
-        .select()
-        .eq('is_deleted', false)
-        .order('updated_at', ascending: false);
+        .from('alerts')
+        .select('state')
+        .eq('alert_type', AlertType.electricityHotspot)
+        .eq('is_deleted', false);
+    return rows.map((row) => row['state'] as String).toSet();
+  }
+
+  Future<List<Report>> reports({bool includeDeleted = false}) async {
+    var query = _client.from('reports').select();
+    if (!includeDeleted) {
+      query = query.eq('is_deleted', false);
+    }
+    final rows = await query.order('updated_at', ascending: false);
     return rows.map((row) => Report.fromMap(row)).toList();
+  }
+
+  Future<void> setReportDeleted(int id, bool isDeleted) async {
+    await _client
+        .from('reports')
+        .update({'is_deleted': isDeleted}).eq('id', id);
   }
 }

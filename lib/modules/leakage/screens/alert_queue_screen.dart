@@ -8,19 +8,42 @@ import 'alert_detail_screen.dart';
 import 'style.dart';
 
 class AlertQueueScreen extends StatefulWidget {
-  const AlertQueueScreen({super.key});
+  final Utility utility;
+  const AlertQueueScreen({super.key, this.utility = Utility.water});
 
   @override
   State<AlertQueueScreen> createState() => _AlertQueueScreenState();
 }
 
-class _AlertQueueScreenState extends State<AlertQueueScreen> {
+class _AlertQueueScreenState extends State<AlertQueueScreen>
+    with SingleTickerProviderStateMixin {
   final _search = TextEditingController();
   String _severity = 'all';
   String _status = 'all';
+  late final TabController _tabController;
+  int _lastIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this)
+      ..addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_tabController.index == _lastIndex) return;
+    _lastIndex = _tabController.index;
+    setState(() {
+      _search.clear();
+      _severity = 'all';
+      _status = 'all';
+    });
+  }
 
   @override
   void dispose() {
+    _tabController.removeListener(_onTabChanged);
+    _tabController.dispose();
     _search.dispose();
     super.dispose();
   }
@@ -29,6 +52,9 @@ class _AlertQueueScreenState extends State<AlertQueueScreen> {
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
     final query = _search.text.trim().toLowerCase();
+    final isWater = widget.utility == Utility.water;
+    final color = isWater ? Colors.blue.shade700 : Colors.amber.shade700;
+    final title = isWater ? 'Water Alerts' : 'Electricity Alerts';
 
     List<Alert> filter(List<Alert> source) {
       return source.where((a) {
@@ -41,39 +67,40 @@ class _AlertQueueScreenState extends State<AlertQueueScreen> {
       }).toList();
     }
 
-    final unresolved = filter(app.unresolvedAlerts);
-    final resolved = filter(app.resolvedAlerts);
+    final unresolvedAll = app.unresolvedFor(widget.utility);
+    final resolvedAll = app.resolvedFor(widget.utility);
+    final unresolved = filter(unresolvedAll);
+    final resolved = filter(resolvedAll);
 
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Leakage alerts'),
-          backgroundColor: Colors.blue.shade700,
-          foregroundColor: Colors.white,
-          bottom: TabBar(
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
-            indicatorColor: Colors.white,
-            tabs: [
-              Tab(text: 'Unresolved · ${app.unresolvedAlerts.length}'),
-              Tab(text: 'Resolved · ${app.resolvedAlerts.length}'),
-            ],
-          ),
-        ),
-        body: Column(
-          children: [
-            _filters(app),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  _list(unresolved, 'No unresolved alerts.'),
-                  _list(resolved, 'No resolved alerts yet.'),
-                ],
-              ),
-            ),
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: color,
+        foregroundColor: Colors.white,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: Colors.white,
+          unselectedLabelColor: Colors.white70,
+          indicatorColor: Colors.white,
+          tabs: [
+            Tab(text: 'Unresolved · ${unresolvedAll.length}'),
+            Tab(text: 'Resolved · ${resolvedAll.length}'),
           ],
         ),
+      ),
+      body: Column(
+        children: [
+          _filters(app),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                _list(unresolved, 'No unresolved alerts.'),
+                _list(resolved, 'No resolved alerts yet.'),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -99,7 +126,7 @@ class _AlertQueueScreenState extends State<AlertQueueScreen> {
             children: [
               Expanded(
                 child: _dropdown('Severity', _severity, {
-                  'all': 'All severity',
+                  'all': 'All Severity',
                   Severity.high: 'High',
                   Severity.medium: 'Medium',
                   Severity.low: 'Low',
@@ -108,10 +135,10 @@ class _AlertQueueScreenState extends State<AlertQueueScreen> {
               const SizedBox(width: 8),
               Expanded(
                 child: _dropdown('Status', _status, {
-                  'all': 'All status',
+                  'all': 'All Status',
                   AlertStatus.pending: 'Pending',
                   AlertStatus.investigating: 'Investigating',
-                  AlertStatus.notFixed: 'Not fixed',
+                  AlertStatus.notFixed: 'Not Fixed',
                   AlertStatus.resolved: 'Resolved',
                 }, (v) => setState(() => _status = v)),
               ),
@@ -155,17 +182,43 @@ class _AlertCard extends StatelessWidget {
   final Alert alert;
   const _AlertCard({required this.alert});
 
+  String _metricUnit() {
+    switch (alert.alertType) {
+      case AlertType.nrwHotspot:
+        return 'of treated water lost';
+      case AlertType.electricityHotspot:
+        return 'of supply unaccounted for';
+      case AlertType.electricityTampering:
+        return 'national loss';
+      default:
+        return 'of the state average';
+    }
+  }
+
+  String _typeLabel() {
+    switch (alert.alertType) {
+      case AlertType.nrwHotspot:
+        return 'NRW Hotspot';
+      case AlertType.electricityHotspot:
+        return 'Electricity Loss';
+      case AlertType.electricityTampering:
+        return 'Tampering Spike';
+      default:
+        return 'Household';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final color = severityColor(alert.severity);
-    final metric = alert.isNrw
+    final usesLossPct = alert.lossPct != null;
+    final metric = usesLossPct
         ? '${alert.lossPct!.toStringAsFixed(1)}%'
         : '${alert.ratio.toStringAsFixed(1)}×';
-    final unit =
-        alert.isNrw ? 'of treated water lost' : 'of the state average';
-    final typeLabel = alert.isNrw ? 'NRW hotspot' : 'Household';
+    final unit = _metricUnit();
+    final typeLabel = _typeLabel();
     final date = DateFormat('d MMM').format(alert.detectedAt);
-    final time = alert.isNrw
+    final time = alert.dataYear != null
         ? 'Flagged $date · ${alert.dataYear} data'
         : 'Flagged $date';
 
@@ -205,7 +258,12 @@ class _AlertCard extends StatelessWidget {
                                 fontSize: 15, fontWeight: FontWeight.w600)),
                         const SizedBox(height: 2),
                         Row(children: [
-                          Icon(alert.isNrw ? Icons.place_outlined : Icons.home_outlined,
+                          Icon(
+                              alert.alertType == AlertType.household
+                                  ? Icons.home_outlined
+                                  : alert.isElectricity
+                                      ? Icons.bolt_outlined
+                                      : Icons.place_outlined,
                               size: 13, color: Colors.black45),
                           const SizedBox(width: 4),
                           Text('$typeLabel · ${Severity.label(alert.severity)}',

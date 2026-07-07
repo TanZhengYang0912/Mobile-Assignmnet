@@ -14,7 +14,7 @@ class ReportViewScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Investigation report'),
+        title: const Text('Investigation Report'),
         backgroundColor: Colors.blue.shade700,
         foregroundColor: Colors.white,
       ),
@@ -40,7 +40,7 @@ class ReportViewScreen extends StatelessWidget {
                 : report.findings),
           ),
           const SizedBox(height: 16),
-          const Text('Action taken',
+          const Text('Action Taken',
               style: TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Container(

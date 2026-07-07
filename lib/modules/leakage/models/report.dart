@@ -7,7 +7,7 @@ class ReportOutcome {
       case fixed:
         return 'Fixed';
       case notFixed:
-        return 'Not fixed';
+        return 'Not Fixed';
       default:
         return outcome;
     }

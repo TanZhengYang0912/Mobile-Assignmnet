@@ -2,10 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import 'modules/auth/screens/role_selection_screen.dart';
+import 'modules/admin/screens/abnormal_production_screen.dart';
+import 'modules/admin/screens/oversight_screen.dart';
+
+import 'modules/auth/screens/login_screen.dart';
 import 'modules/auth/state/auth_state.dart' show RoleState;
 
 import 'modules/leakage/data/leakage_repository.dart';
+import 'modules/leakage/models/alert.dart' show Utility;
 import 'modules/leakage/screens/home_screen.dart';
 import 'modules/leakage/services/baseline_service.dart';
 import 'modules/leakage/services/nrw_service.dart';
@@ -16,10 +20,8 @@ import 'modules/dataset/data/dataset_repository.dart';
 import 'modules/dataset/screens/dashboard_screen.dart';
 import 'modules/dataset/state/dataset_state.dart';
 
-import 'modules/electricity/screens/electricity_dashboard.dart';
-import 'modules/electricity/state/electricity_state.dart';
-
-import 'modules/usage/screens/work_in_progress_screen.dart';
+import 'modules/usage/screens/compare_usage_screen.dart';
+import 'modules/usage/screens/report_problem_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,14 +66,7 @@ class MySumberApp extends StatelessWidget {
           },
         ),
         ChangeNotifierProvider<DatasetState>(
-          create: (context) {
-            final leakageRepo = context.read<AppState>().repository;
-            final repository = DatasetRepository(leakageRepo: leakageRepo);
-            return DatasetState(repository: repository);
-          },
-        ),
-        ChangeNotifierProvider<ElectricityState>(
-          create: (_) => ElectricityState(),
+          create: (_) => DatasetState(repository: DatasetRepository()),
         ),
       ],
       child: MaterialApp(
@@ -108,7 +103,7 @@ class MySumberApp extends StatelessWidget {
             if (authState.isLoggedIn) {
               return AppShell(userRole: authState.userRole!);
             } else {
-              return const RoleSelectionScreen();
+              return const LoginScreen();
             }
           },
         ),
@@ -140,46 +135,67 @@ class _AppShellState extends State<AppShell> {
   }
 
   void _setupScreensByRole() {
-    if (widget.userRole == 'admin') {
-      _screens = [
-        const DashboardScreen(), // Module 1
-        const HomeScreen(), // Module 3
-        const ElectricityDashboardScreen(), // Module 4
-      ];
-      _tabColors = [
-        Colors.teal.shade700,
-        Colors.blue.shade700,
-        Colors.amber.shade700,
-      ];
-      _navItems = const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.dashboard),
-          label: 'Equipment',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.report_problem),
-          label: 'Leakage',
-        ),
-        BottomNavigationBarItem(
-          icon: Icon(Icons.electric_meter),
-          label: 'Electricity',
-        ),
-      ];
-    } else {
-      // Consumer role
-      _screens = [
-        const WorkInProgressScreen(), // Module 2
-      ];
-      _tabColors = [
-
-        Colors.blue.shade700,
-      ];
-      _navItems = const [
-        BottomNavigationBarItem(
-          icon: Icon(Icons.person),
-          label: 'My Usage',
-        ),
-      ];
+    switch (widget.userRole) {
+      case 'admin':
+        _screens = [
+          const DashboardScreen(), // Module 1: equipment
+          const AbnormalProductionScreen(), // generate abnormal-production alerts
+          const OversightScreen(), // oversight + alert gate + report hide
+        ];
+        _tabColors = [
+          Colors.teal.shade700,
+          Colors.red.shade700,
+          Colors.blue.shade700,
+        ];
+        _navItems = const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Equipment',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.flag_outlined),
+            label: 'Alerts',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.visibility_outlined),
+            label: 'Oversight',
+          ),
+        ];
+        break;
+      case 'worker':
+        _screens = [
+          const HomeScreen(utility: Utility.water),
+          const HomeScreen(utility: Utility.electricity),
+        ];
+        _tabColors = [Colors.blue.shade700, Colors.amber.shade700];
+        _navItems = const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem),
+            label: 'Water',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.electric_meter),
+            label: 'Electricity',
+          ),
+        ];
+        break;
+      default:
+        // Normal user
+        _screens = [
+          const CompareUsageScreen(),
+          const ReportProblemScreen(),
+        ];
+        _tabColors = [Colors.blue.shade700, Colors.red.shade700];
+        _navItems = const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.compare_arrows),
+            label: 'Compare',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.report_problem_outlined),
+            label: 'Report',
+          ),
+        ];
     }
   }
 
@@ -213,6 +229,7 @@ class _AppShellState extends State<AppShell> {
       body: _screens[_currentIndex],
       bottomNavigationBar: _navItems.length > 1
           ? BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
               currentIndex: _currentIndex,
               onTap: (index) => setState(() => _currentIndex = index),
               selectedItemColor: _tabColors[_currentIndex],

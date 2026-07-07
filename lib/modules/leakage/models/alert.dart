@@ -4,8 +4,16 @@ class AlertStatus {
   static const resolved = 'resolved';
   static const notFixed = 'not_fixed';
   static const dismissed = 'dismissed';
+  static const faults = 'faults';
 
-  static const all = [pending, investigating, resolved, notFixed, dismissed];
+  static const all = [
+    pending,
+    investigating,
+    resolved,
+    notFixed,
+    dismissed,
+    faults,
+  ];
   static const unresolved = [pending, investigating, notFixed];
 
   static String label(String status) {
@@ -17,9 +25,11 @@ class AlertStatus {
       case resolved:
         return 'Resolved';
       case notFixed:
-        return 'Not fixed';
+        return 'Not Fixed';
       case dismissed:
         return 'Dismissed';
+      case faults:
+        return 'Faults';
       default:
         return status;
     }
@@ -29,6 +39,21 @@ class AlertStatus {
 class AlertType {
   static const nrwHotspot = 'nrw_hotspot';
   static const household = 'household';
+  static const electricityHotspot = 'electricity_hotspot';
+  static const electricityTampering = 'electricity_tampering';
+
+  static const _electricity = [electricityHotspot, electricityTampering];
+  static bool isElectricity(String type) => _electricity.contains(type);
+}
+
+/// Which utility an alert belongs to — used to split the worker's Water
+/// and Electricity queues, report histories, and detail evidence views.
+enum Utility {
+  water(['nrw_hotspot', 'household']),
+  electricity(['electricity_hotspot', 'electricity_tampering']);
+
+  final List<String> alertTypes;
+  const Utility(this.alertTypes);
 }
 
 class LeakSignature {
@@ -37,6 +62,8 @@ class LeakSignature {
   static const creepingLeak = 'Creeping leak';
   static const seasonalSpike = 'Seasonal spike';
   static const nrwHotspot = 'NRW hotspot';
+  static const electricityHotspot = 'Electricity loss hotspot';
+  static const electricityTampering = 'Potential tampering';
 }
 
 class Severity {
@@ -47,11 +74,11 @@ class Severity {
   static String label(String severity) {
     switch (severity) {
       case high:
-        return 'High severity';
+        return 'High Severity';
       case medium:
-        return 'Medium severity';
+        return 'Medium Severity';
       case low:
-        return 'Low severity';
+        return 'Low Severity';
       default:
         return severity;
     }
@@ -100,10 +127,23 @@ class Alert {
   });
 
   bool get isNrw => alertType == AlertType.nrwHotspot;
+  bool get isElectricity => AlertType.isElectricity(alertType);
+  bool get isElectricityHotspot => alertType == AlertType.electricityHotspot;
+  bool get isElectricityTampering =>
+      alertType == AlertType.electricityTampering;
+  Utility get utility => isElectricity ? Utility.electricity : Utility.water;
+
+  /// True for the per-region loss alerts (water NRW or electricity hotspot)
+  /// that share the produced/billed/loss "balance" evidence layout.
+  bool get isLossBalance =>
+      alertType == AlertType.nrwHotspot ||
+      alertType == AlertType.electricityHotspot;
+
   double get ratio => baselineL == 0 ? 0 : actualL / baselineL;
   bool get isUnresolved => AlertStatus.unresolved.contains(status);
 
-  String get title => isNrw ? state : '$state · ${householdId ?? ''}';
+  String get title =>
+      alertType == AlertType.household ? '$state · ${householdId ?? ''}' : state;
 
   Map<String, Object?> toMap() => {
         'id': id,
