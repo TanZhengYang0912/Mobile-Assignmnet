@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -15,20 +16,61 @@ class ReviewManagementScreen extends StatefulWidget {
 }
 
 class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
-  bool _generating = false;
-
   Future<void> _generate(BuildContext context) async {
-    setState(() => _generating = true);
     final app = context.read<AppState>();
     final messenger = ScaffoldMessenger.of(context);
-    final ok = await app.generateAiSummary();
-    if (mounted) {
-      setState(() => _generating = false);
-      messenger.showSnackBar(SnackBar(
-        content: Text(ok ? 'AI Insights generated!' : 'Generation failed — check Groq key.'),
-        backgroundColor: ok ? AppColors.success : AppColors.critical,
-      ));
+    // Defensive try/catch: generateAiSummary is contract-bound to return a
+    // SummaryResult and swallow its own errors, but if it ever regresses we
+    // must still leave the AppState guard in a clean state and inform the user.
+    SummaryResult result;
+    try {
+      result = await app.generateAiSummary();
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('_generate uncaught: $e\n$st');
+      result = SummaryResult.storageError;
     }
+    if (!mounted) return;
+    if (result == SummaryResult.alreadyRunning) return; // silent skip
+
+    final String message;
+    final Color color;
+    switch (result) {
+      case SummaryResult.success:
+        message = 'AI Insights generated!';
+        color = AppColors.success;
+        break;
+      case SummaryResult.belowThreshold:
+        message =
+            'Need at least ${AppState.minReviewsForSummary} detailed reviews (with tags or comment).';
+        color = AppColors.warning;
+        break;
+      case SummaryResult.upToDate:
+        message = 'Summary is already up to date — no new reviews.';
+        color = AppColors.workerPrimary;
+        break;
+      case SummaryResult.networkError:
+        message = 'Network error — request timed out or connection failed.';
+        color = AppColors.critical;
+        break;
+      case SummaryResult.apiError:
+        message = 'Groq API error — check your API key or rate limit.';
+        color = AppColors.critical;
+        break;
+      case SummaryResult.parseError:
+        message = 'AI response format invalid — please try again.';
+        color = AppColors.critical;
+        break;
+      case SummaryResult.storageError:
+        message = 'Failed to save summary — check Supabase connection.';
+        color = AppColors.critical;
+        break;
+      case SummaryResult.alreadyRunning:
+        return; // unreachable — handled above
+    }
+    messenger.showSnackBar(SnackBar(
+      content: Text(message),
+      backgroundColor: color,
+    ));
   }
 
   @override
@@ -37,9 +79,35 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
     final reviews = app.reviews;
     final summary = app.latestSummary;
 
-    final avgStars = reviews.isEmpty
+    // Exclude 0-star entries from the average — they represent unrated or
+    // malformed rows and would drag the mean toward zero.
+    // Materialise once so isEmpty / reduce / length don't each re-iterate.
+    final ratedStars =
+        reviews.where((r) => r.stars > 0).map((r) => r.stars).toList();
+    final avgStars = ratedStars.isEmpty
         ? 0.0
-        : reviews.map((r) => r.stars).reduce((a, b) => a + b) / reviews.length;
+        : ratedStars.reduce((a, b) => a + b) / ratedStars.length;
+    final detailedCount = app.validReviewCount;
+
+    final canGen = app.canGenerateSummary;
+    final isUpToDate = app.isSummaryUpToDate;
+    final generating = app.isGeneratingSummary;
+    final canGenerate = canGen && !isUpToDate;
+
+    // Below-threshold takes priority over "Regenerate" — a disabled button
+    // labelled "Regenerate" while the hint says "Need X more" is contradictory.
+    final String buttonLabel;
+    if (generating) {
+      buttonLabel = 'Generating...';
+    } else if (!canGen) {
+      buttonLabel = '✨ Generate AI Insights';
+    } else if (summary != null && isUpToDate) {
+      buttonLabel = '✓ Summary Up to Date';
+    } else if (summary != null) {
+      buttonLabel = '✨ Regenerate AI Insights';
+    } else {
+      buttonLabel = '✨ Generate AI Insights';
+    }
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -47,12 +115,13 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
         padding: EdgeInsets.zero,
         children: [
           _header(),
-          _statsRow(reviews.length, avgStars, summary),
+          _statsRow(reviews.length, detailedCount, avgStars, summary),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: FilledButton.icon(
-              onPressed: _generating ? null : () => _generate(context),
-              icon: _generating
+              onPressed:
+                  (generating || !canGenerate) ? null : () => _generate(context),
+              icon: generating
                   ? const SizedBox(
                       width: 16,
                       height: 16,
@@ -60,7 +129,7 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
                           color: Colors.white, strokeWidth: 2),
                     )
                   : const Icon(Icons.auto_awesome, size: 18),
-              label: Text(_generating ? 'Generating...' : '✨ Generate AI Insights'),
+              label: Text(buttonLabel),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.adminPrimary,
                 minimumSize: const Size.fromHeight(52),
@@ -68,6 +137,10 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
                     fontSize: 15, fontWeight: FontWeight.w800),
               ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+            child: _hintRow(app, summary),
           ),
           if (summary != null) ...[
             Padding(
@@ -95,6 +168,54 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  Widget _hintRow(AppState app, AiSummary? summary) {
+    // Priority: below-threshold > up-to-date > new-reviews-since-last > blank.
+    if (!app.canGenerateSummary) {
+      final n = app.reviewsUntilSummary;
+      return _hintPill(
+        Icons.lock_outline,
+        AppColors.textTertiary,
+        'Need $n more detailed review${n == 1 ? '' : 's'} (with tags or comment) to unlock AI Insights',
+      );
+    }
+    if (app.isSummaryUpToDate) {
+      final analyzed = summary!.reviewCount;
+      return _hintPill(
+        Icons.check_circle_outline,
+        AppColors.success,
+        'Summary up to date — $analyzed detailed review${analyzed == 1 ? '' : 's'} analyzed',
+      );
+    }
+    if (summary != null && app.newReviewsSinceSummary > 0) {
+      final n = app.newReviewsSinceSummary;
+      final capNote =
+          n > 50 ? ' — newest 50 will be analyzed' : ' — consider regenerating';
+      return _hintPill(
+        Icons.fiber_new_outlined,
+        AppColors.warning,
+        '$n new detailed review${n == 1 ? '' : 's'} since last summary$capNote',
+      );
+    }
+    return const SizedBox(height: 4);
+  }
+
+  Widget _hintPill(IconData icon, Color color, String text) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            text,
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: color),
+          ),
+        ),
+      ],
     );
   }
 
@@ -144,7 +265,7 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
     );
   }
 
-  Widget _statsRow(int total, double avg, AiSummary? summary) {
+  Widget _statsRow(int total, int detailed, double avg, AiSummary? summary) {
     final lastGen = summary == null
         ? 'Never'
         : DateFormat('d MMM, HH:mm').format(summary.generatedAt.toLocal());
@@ -157,6 +278,7 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
             child: _StatCell(
               label: 'Total Reviews',
               value: '$total',
+              subline: total == 0 ? null : '$detailed with tags/comment',
               icon: Icons.rate_review_outlined,
               color: AppColors.adminPrimary,
               bg: AppColors.adminSurface,
@@ -192,6 +314,7 @@ class _ReviewManagementScreenState extends State<ReviewManagementScreen> {
 class _StatCell extends StatelessWidget {
   final String label;
   final String value;
+  final String? subline;
   final IconData icon;
   final Color color;
   final Color bg;
@@ -200,6 +323,7 @@ class _StatCell extends StatelessWidget {
   const _StatCell({
     required this.label,
     required this.value,
+    this.subline,
     required this.icon,
     required this.color,
     required this.bg,
@@ -239,6 +363,12 @@ class _StatCell extends StatelessWidget {
           Text(label,
               style: const TextStyle(
                   fontSize: 11, color: AppColors.textSecondary)),
+          if (subline != null)
+            Text(subline!,
+                style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                    color: color)),
         ],
       ),
     );
@@ -275,7 +405,7 @@ class _AiSummaryCard extends StatelessWidget {
                       fontWeight: FontWeight.w800)),
               const Spacer(),
               Text(
-                'Based on ${summary.reviewCount} reviews',
+                'Based on ${summary.reviewCount} detailed review${summary.reviewCount == 1 ? '' : 's'}',
                 style:
                     const TextStyle(color: Colors.white70, fontSize: 11),
               ),

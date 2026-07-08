@@ -8,6 +8,7 @@ class EquipmentNode {
   final String? manufacturer;
   final DateTime? installationDate;
   final DateTime? lastMaintenanceDate;
+  final DateTime? nextMaintenanceDate;
   final int healthScore;
   final String? firmwareVersion;
   final String? ipAddress;
@@ -22,6 +23,7 @@ class EquipmentNode {
     this.manufacturer,
     this.installationDate,
     this.lastMaintenanceDate,
+    this.nextMaintenanceDate,
     this.healthScore = 100,
     this.firmwareVersion,
     this.ipAddress,
@@ -37,6 +39,7 @@ class EquipmentNode {
         if (manufacturer != null) 'manufacturer': manufacturer,
         if (installationDate != null) 'installation_date': installationDate!.toIso8601String(),
         if (lastMaintenanceDate != null) 'last_maintenance_date': lastMaintenanceDate!.toIso8601String(),
+        if (nextMaintenanceDate != null) 'next_maintenance_date': nextMaintenanceDate!.toIso8601String(),
         'health_score': healthScore,
         if (firmwareVersion != null) 'firmware_version': firmwareVersion,
         if (ipAddress != null) 'ip_address': ipAddress,
@@ -52,6 +55,7 @@ class EquipmentNode {
         manufacturer: map['manufacturer'] as String?,
         installationDate: map['installation_date'] != null ? DateTime.parse(map['installation_date'] as String) : null,
         lastMaintenanceDate: map['last_maintenance_date'] != null ? DateTime.parse(map['last_maintenance_date'] as String) : null,
+        nextMaintenanceDate: map['next_maintenance_date'] != null ? DateTime.parse(map['next_maintenance_date'] as String) : null,
         healthScore: map['health_score'] as int? ?? 100,
         firmwareVersion: map['firmware_version'] as String?,
         ipAddress: map['ip_address'] as String?,
@@ -67,6 +71,7 @@ class EquipmentNode {
     String? manufacturer,
     DateTime? installationDate,
     DateTime? lastMaintenanceDate,
+    DateTime? nextMaintenanceDate,
     int? healthScore,
     String? firmwareVersion,
     String? ipAddress,
@@ -81,6 +86,7 @@ class EquipmentNode {
       manufacturer: manufacturer ?? this.manufacturer,
       installationDate: installationDate ?? this.installationDate,
       lastMaintenanceDate: lastMaintenanceDate ?? this.lastMaintenanceDate,
+      nextMaintenanceDate: nextMaintenanceDate ?? this.nextMaintenanceDate,
       healthScore: healthScore ?? this.healthScore,
       firmwareVersion: firmwareVersion ?? this.firmwareVersion,
       ipAddress: ipAddress ?? this.ipAddress,

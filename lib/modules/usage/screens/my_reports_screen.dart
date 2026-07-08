@@ -209,16 +209,14 @@ class _AlertReviewCard extends StatelessWidget {
                 style: const TextStyle(
                     fontSize: 12, color: AppColors.textSecondary),
               ),
-              if (alert.lossPct != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  '${alert.lossPct!.toStringAsFixed(1)}% loss resolved',
-                  style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: accent),
-                ),
-              ],
+              const SizedBox(height: 4),
+              Text(
+                _issueLabel(alert),
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: accent),
+              ),
               const SizedBox(height: 12),
               if (!reviewed)
                 SizedBox(
@@ -284,6 +282,21 @@ class _AlertReviewCard extends StatelessWidget {
     );
   }
 
+  String _issueLabel(Alert alert) {
+    switch (alert.alertType) {
+      case AlertType.household:
+        return 'Household water leak resolved';
+      case AlertType.nrwHotspot:
+        return 'Water network issue resolved';
+      case AlertType.electricityHotspot:
+        return 'Electricity distribution issue resolved';
+      case AlertType.electricityTampering:
+        return 'Electricity irregularity resolved';
+      default:
+        return 'Issue resolved';
+    }
+  }
+
   Future<void> _openRatingSheet(BuildContext context) async {
     await showModalBottomSheet(
       context: context,
@@ -341,11 +354,35 @@ class _RateRepairSheet extends StatefulWidget {
   State<_RateRepairSheet> createState() => _RateRepairSheetState();
 }
 
+// Tags that cannot coexist — selecting one removes the other.
+const _exclusivePairs = [
+  ('Professional', 'Unprofessional'),
+  ('Fast Response', 'Slow Response'),
+  ('Perfectly Fixed', 'Still Leaking'),
+  ('Perfectly Fixed', 'Poor Fix'),
+];
+
 class _RateRepairSheetState extends State<_RateRepairSheet> {
   int _stars = 0;
   final Set<String> _tags = {};
   final _commentCtrl = TextEditingController();
   bool _submitting = false;
+  String? _errorMessage;
+
+  void _toggleTag(String tag) {
+    setState(() {
+      if (_tags.contains(tag)) {
+        _tags.remove(tag);
+      } else {
+        _tags.add(tag);
+        // Remove any tag that contradicts the one just added.
+        for (final (a, b) in _exclusivePairs) {
+          if (tag == a) _tags.remove(b);
+          if (tag == b) _tags.remove(a);
+        }
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -431,10 +468,7 @@ class _RateRepairSheetState extends State<_RateRepairSheet> {
                               selected: _tags.contains(t),
                               color: AppColors.success,
                               bg: AppColors.successSurface,
-                              onTap: () => setState(
-                                  () => _tags.contains(t)
-                                      ? _tags.remove(t)
-                                      : _tags.add(t)),
+                              onTap: () => _toggleTag(t),
                             ))
                         .toList(),
                   ),
@@ -454,10 +488,7 @@ class _RateRepairSheetState extends State<_RateRepairSheet> {
                               selected: _tags.contains(t),
                               color: AppColors.critical,
                               bg: AppColors.criticalSurface,
-                              onTap: () => setState(
-                                  () => _tags.contains(t)
-                                      ? _tags.remove(t)
-                                      : _tags.add(t)),
+                              onTap: () => _toggleTag(t),
                             ))
                         .toList(),
                   ),
@@ -478,6 +509,33 @@ class _RateRepairSheetState extends State<_RateRepairSheet> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  if (_errorMessage != null) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: AppColors.criticalSurface,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: AppColors.critical.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline,
+                              color: AppColors.critical, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(
+                                  fontSize: 13, color: AppColors.critical),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   FilledButton(
                     onPressed: _stars == 0 || _submitting ? null : _submit,
                     style: FilledButton.styleFrom(
@@ -507,8 +565,56 @@ class _RateRepairSheetState extends State<_RateRepairSheet> {
     );
   }
 
+  bool _commentConflictsWithStars() {
+    if (_stars < 4) return false;
+    final comment = _commentCtrl.text.trim().toLowerCase();
+    const negativeWords = [
+      'bad', 'poor', 'terrible', 'still leak', 'not fixed', 'slow', 'rude',
+      'disappoint', 'worst', 'awful', 'horrible', 'unhappy', 'broken',
+      'failed', 'wrong', 'damage', 'worse', 'useless', 'unprofessional',
+      'overcharged', 'not resolved', 'not repaired',
+    ];
+    final hasNegativeTags = _tags.any((t) => _negativeTags.contains(t));
+    final commentNegative = comment.isNotEmpty &&
+        negativeWords.any((w) => comment.contains(w));
+    return hasNegativeTags || commentNegative;
+  }
+
   Future<void> _submit() async {
-    setState(() => _submitting = true);
+    if (_commentConflictsWithStars()) {
+      final proceed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Rating mismatch'),
+          content: const Text(
+            'Your comment or tags seem negative, but you selected a high rating. '
+            'Did you mean to give a lower rating?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Change Rating'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              style: FilledButton.styleFrom(
+                  backgroundColor: AppColors.adminPrimary),
+              child: const Text('Submit Anyway'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted) return;
+      if (proceed != true) return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _errorMessage = null;
+    });
+    final app = context.read<AppState>();
+    final nav = Navigator.of(context);
+    final messenger = ScaffoldMessenger.of(context);
     final review = ServiceReview(
       alertId: widget.alert.id,
       consumerEmail: widget.email,
@@ -517,8 +623,45 @@ class _RateRepairSheetState extends State<_RateRepairSheet> {
       comment: _commentCtrl.text.trim(),
       createdAt: DateTime.now(),
     );
-    await context.read<AppState>().submitReview(review);
-    if (mounted) Navigator.of(context).pop();
+
+    ReviewSubmitResult result;
+    try {
+      result = await app.submitReview(review);
+    } catch (_) {
+      result = ReviewSubmitResult.storageError;
+    }
+    if (!mounted) return;
+
+    if (result == ReviewSubmitResult.success) {
+      nav.pop();
+      // Snackbar shows on the parent screen (My Repair Reports) after the
+      // sheet closes — messenger reference is to the parent Scaffold.
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Thanks — your review has been submitted!'),
+        backgroundColor: AppColors.success,
+      ));
+      return;
+    }
+
+    // Failure: keep the sheet open with the user's input intact and surface
+    // a specific reason inline (snackbars would sit behind the sheet).
+    final String reason;
+    switch (result) {
+      case ReviewSubmitResult.networkError:
+        reason =
+            'No internet connection. Please check your network and try again.';
+        break;
+      case ReviewSubmitResult.storageError:
+        reason =
+            'Couldn\'t reach the server. Please try again in a moment.';
+        break;
+      case ReviewSubmitResult.success:
+        return; // unreachable — handled above
+    }
+    setState(() {
+      _submitting = false;
+      _errorMessage = reason;
+    });
   }
 }
 

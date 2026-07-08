@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'theme/tokens.dart';
 
+import 'modules/admin/screens/abnormal_production_screen.dart';
 import 'modules/admin/screens/oversight_screen.dart';
 import 'modules/admin/screens/review_management_screen.dart';
 
@@ -20,6 +21,7 @@ import 'modules/leakage/state/app_state.dart';
 
 import 'modules/dataset/data/dataset_repository.dart';
 import 'modules/dataset/screens/dashboard_screen.dart';
+import 'modules/dataset/screens/inventory_screen.dart';
 import 'modules/dataset/state/dataset_state.dart';
 
 import 'modules/usage/screens/customer_home_screen.dart';
@@ -174,15 +176,17 @@ class _AppShellState extends State<AppShell> {
       case 'admin':
         _screens = const [
           DashboardScreen(),
-          OversightScreen(section: OversightSection.alerts),
+          InventoryScreen(),
+          AbnormalProductionScreen(),
           OversightScreen(section: OversightSection.reports),
           ReviewManagementScreen(),
         ];
         _navItems = const [
-          _NavItem(icon: Icons.build_outlined, label: 'Equipment'),
+          _NavItem(icon: Icons.grid_view_outlined, label: 'Dashboard'),
+          _NavItem(icon: Icons.inventory_2_outlined, label: 'Inventory'),
           _NavItem(icon: Icons.notifications_outlined, label: 'Alerts'),
-          _NavItem(icon: Icons.grid_view_outlined, label: 'Oversight'),
-          _NavItem(icon: Icons.star_outline, label: 'Reviews'),
+          _NavItem(icon: Icons.shield_outlined, label: 'Oversight'),
+          _NavItem(icon: Icons.article_outlined, label: 'Review'),
         ];
         break;
       case 'worker':
@@ -196,10 +200,10 @@ class _AppShellState extends State<AppShell> {
         ];
         break;
       default:
-        _screens = const [
-          CustomerHomeScreen(),
-          CompareUsageScreen(),
-          ReportProblemScreen(),
+        _screens = [
+          CustomerHomeScreen(onUsageTap: () => setState(() => _currentIndex = 1)),
+          const CompareUsageScreen(),
+          const ReportProblemScreen(),
         ];
         _navItems = const [
           _NavItem(icon: Icons.home_outlined, label: 'Home'),

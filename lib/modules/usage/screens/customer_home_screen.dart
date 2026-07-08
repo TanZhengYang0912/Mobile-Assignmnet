@@ -8,7 +8,8 @@ import '../../leakage/state/app_state.dart';
 import 'my_reports_screen.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
-  const CustomerHomeScreen({super.key});
+  final VoidCallback? onUsageTap;
+  const CustomerHomeScreen({super.key, this.onUsageTap});
 
   @override
   Widget build(BuildContext context) {
@@ -45,7 +46,10 @@ class CustomerHomeScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            child: _myUsageCard(),
+            child: GestureDetector(
+              onTap: onUsageTap,
+              child: _myUsageCard(),
+            ),
           ),
           if (summary != null)
             Padding(

@@ -367,6 +367,17 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
   }
 }
 
+enum _ElecScenario {
+  highUsage('High electricity usage', false),
+  meterTampering('Suspected meter tampering', true),
+  frequentTrips('Frequent power trips', false),
+  other('Other issue', false);
+
+  final String label;
+  final bool isTampering;
+  const _ElecScenario(this.label, this.isTampering);
+}
+
 /// Dedicated flow for reporting a problem — moved off the profile screen so
 /// account details stay focused on identity.
 class _ReportFlowScreen extends StatefulWidget {
@@ -378,7 +389,9 @@ class _ReportFlowScreen extends StatefulWidget {
 
 class _ReportFlowScreenState extends State<_ReportFlowScreen> {
   String _selectedState = 'Selangor';
-  LeakScenario? _pendingScenario;
+  bool _isWater = true;
+  LeakScenario? _pendingWater;
+  _ElecScenario? _pendingElec;
 
   @override
   Widget build(BuildContext context) {
@@ -407,6 +420,40 @@ class _ReportFlowScreenState extends State<_ReportFlowScreen> {
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
+          // Utility toggle
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: const [
+                BoxShadow(
+                    color: Color(0x0A000000),
+                    blurRadius: 6,
+                    offset: Offset(0, 2))
+              ],
+            ),
+            padding: const EdgeInsets.all(4),
+            child: Row(
+              children: [
+                Expanded(child: _utilityTab('Water', Icons.water_drop_outlined,
+                    AppColors.waterAccent, _isWater, () => setState(() {
+                          _isWater = true;
+                          _pendingElec = null;
+                        }))),
+                Expanded(
+                    child: _utilityTab(
+                        'Electricity',
+                        Icons.electric_bolt_outlined,
+                        AppColors.electricityAccent,
+                        !_isWater,
+                        () => setState(() {
+                              _isWater = false;
+                              _pendingWater = null;
+                            }))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           AppCard(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -418,22 +465,24 @@ class _ReportFlowScreenState extends State<_ReportFlowScreen> {
                   isDense: true,
                   decoration: const InputDecoration(
                     labelText: 'State',
-                    contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(),
                   ),
                   items: states
                       .map((s) => DropdownMenuItem(value: s, child: Text(s)))
                       .toList(),
-                  onChanged: (s) => setState(
-                      () => _selectedState = s ?? _selectedState),
+                  onChanged: (s) =>
+                      setState(() => _selectedState = s ?? _selectedState),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Average domestic use: ${perCapita.toStringAsFixed(0)} L/person/day (${app.baseline.latestYear})',
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary),
-                ),
+                if (_isWater) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Average domestic use: ${perCapita.toStringAsFixed(0)} L/person/day (${app.baseline.latestYear})',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
               ],
             ),
           ),
@@ -444,18 +493,24 @@ class _ReportFlowScreenState extends State<_ReportFlowScreen> {
               children: [
                 const SectionLabel('WHAT\'S HAPPENING'),
                 const SizedBox(height: 4),
-                const Text(
-                  'Describe what\'s happening — we\'ll check it against your state\'s average.',
-                  style: TextStyle(
+                Text(
+                  _isWater
+                      ? 'Describe what\'s happening — we\'ll check it against your state\'s average.'
+                      : 'Select the issue you\'re experiencing — we\'ll escalate it to the team.',
+                  style: const TextStyle(
                       fontSize: 13, color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 14),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: LeakScenario.values
-                      .map((s) => _scenarioChip(app, s))
-                      .toList(),
+                  children: _isWater
+                      ? LeakScenario.values
+                          .map((s) => _waterChip(app, s))
+                          .toList()
+                      : _ElecScenario.values
+                          .map((s) => _elecChip(app, s))
+                          .toList(),
                 ),
               ],
             ),
@@ -466,54 +521,117 @@ class _ReportFlowScreenState extends State<_ReportFlowScreen> {
     );
   }
 
-  Widget _scenarioChip(AppState app, LeakScenario scenario) {
-    final selected = _pendingScenario == scenario;
+  Widget _utilityTab(String label, IconData icon, Color accent, bool selected,
+      VoidCallback onTap) {
     return GestureDetector(
-      onTap: () {
-        setState(() => _pendingScenario = scenario);
-        _submit(app, scenario);
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: selected
-              ? AppColors.adminPrimary
-              : AppColors.adminSurface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-              color: selected
-                  ? AppColors.adminPrimary
-                  : AppColors.adminPrimary.withValues(alpha: 0.3)),
+          color: selected ? accent.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(9),
         ),
-        child: Text(
-          scenario.label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-            color: selected ? Colors.white : AppColors.adminPrimary,
-          ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon,
+                size: 16, color: selected ? accent : AppColors.textTertiary),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: selected ? accent : AppColors.textTertiary,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Future<void> _submit(AppState app, LeakScenario scenario) async {
+  Widget _waterChip(AppState app, LeakScenario scenario) {
+    final selected = _pendingWater == scenario;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _pendingWater = scenario);
+        _submitWater(app, scenario);
+      },
+      child: _chip(scenario.label, selected, AppColors.waterAccent),
+    );
+  }
+
+  Widget _elecChip(AppState app, _ElecScenario scenario) {
+    final selected = _pendingElec == scenario;
+    return GestureDetector(
+      onTap: () {
+        setState(() => _pendingElec = scenario);
+        _submitElectricity(app, scenario);
+      },
+      child: _chip(scenario.label, selected, AppColors.electricityAccent),
+    );
+  }
+
+  Widget _chip(String label, bool selected, Color accent) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: selected ? accent : accent.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: selected ? accent : accent.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : accent,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitWater(AppState app, LeakScenario scenario) async {
     try {
       final outcome = await app.simulate(scenario, _selectedState);
       if (!mounted) return;
-      setState(() => _pendingScenario = null);
+      setState(() => _pendingWater = null);
       final message = outcome.anomalyRaised
           ? 'Thanks — flagged as ${outcome.result.signature} (${outcome.result.severity}) and sent to our team.'
           : 'Your usage looks within the normal range (${outcome.result.ratio.toStringAsFixed(1)}x average). No report needed.';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
         content: Text(message),
-        backgroundColor: outcome.anomalyRaised
-            ? AppColors.critical
-            : AppColors.success,
+        backgroundColor:
+            outcome.anomalyRaised ? AppColors.critical : AppColors.success,
       ));
     } catch (_) {
       if (mounted) {
-        setState(() => _pendingScenario = null);
+        setState(() => _pendingWater = null);
+        showNetworkErrorSnackBar(context);
+      }
+    }
+  }
+
+  Future<void> _submitElectricity(AppState app, _ElecScenario scenario) async {
+    try {
+      await app.reportCustomerElectricityIssue(
+        scenarioLabel: scenario.label,
+        isTampering: scenario.isTampering,
+        state: _selectedState,
+      );
+      if (!mounted) return;
+      setState(() => _pendingElec = null);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(
+            'Thanks — your ${scenario.label.toLowerCase()} report in $_selectedState has been sent to our team.'),
+        backgroundColor: AppColors.electricityAccent,
+      ));
+    } catch (_) {
+      if (mounted) {
+        setState(() => _pendingElec = null);
         showNetworkErrorSnackBar(context);
       }
     }
