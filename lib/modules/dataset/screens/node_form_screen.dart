@@ -40,7 +40,7 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
   ];
 
   static const _utilityTypes = ['Water', 'Electricity'];
-  static const _statuses = ['Active', 'Warning', 'Critical'];
+  static const _statuses = ['Active', 'Warning', 'Critical', 'Maintenance'];
 
   bool get _isEditing => widget.node != null;
 
@@ -55,7 +55,8 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
         TextEditingController(text: widget.node?.firmwareVersion ?? '');
 
     _utilityType = widget.node?.utilityType ?? 'Water';
-    _status = widget.node?.status ?? 'Active';
+    final rawStatus = widget.node?.status ?? 'Active';
+    _status = _statuses.contains(rawStatus) ? rawStatus : 'Active';
     _zoneId = widget.node?.zoneId ?? 'Selangor';
     if (!_malaysianStates.contains(_zoneId)) _zoneId = 'Selangor';
 

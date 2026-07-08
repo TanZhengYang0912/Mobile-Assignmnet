@@ -178,7 +178,7 @@ class _AppShellState extends State<AppShell> {
           DashboardScreen(),
           InventoryScreen(),
           AbnormalProductionScreen(),
-          OversightScreen(section: OversightSection.reports),
+          OversightScreen(),
           ReviewManagementScreen(),
         ];
         _navItems = const [

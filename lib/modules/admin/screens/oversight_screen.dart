@@ -14,19 +14,18 @@ import 'admin_alert_detail_screen.dart';
 
 enum OversightSection { alerts, reports }
 
-/// Admin oversight of the worker's alert queue and report history.
-/// The nav bar routes each section (Alerts / Oversight) to this same screen
-/// with a different `section` argument so the header stays consistent.
 class OversightScreen extends StatefulWidget {
-  final OversightSection section;
+  final OversightSection initialSection;
   const OversightScreen(
-      {super.key, this.section = OversightSection.alerts});
+      {super.key, this.initialSection = OversightSection.alerts});
 
   @override
   State<OversightScreen> createState() => _OversightScreenState();
 }
 
-class _OversightScreenState extends State<OversightScreen> {
+class _OversightScreenState extends State<OversightScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _outerTab;
   Utility? _alertUtility;
   Utility? _reportUtility;
   String? _reportOutcome;
@@ -34,7 +33,20 @@ class _OversightScreenState extends State<OversightScreen> {
   final _reportSearch = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    _outerTab = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex:
+          widget.initialSection == OversightSection.alerts ? 0 : 1,
+    );
+    _outerTab.addListener(() => setState(() {}));
+  }
+
+  @override
   void dispose() {
+    _outerTab.dispose();
     _reportSearch.dispose();
     super.dispose();
   }
@@ -42,19 +54,51 @@ class _OversightScreenState extends State<OversightScreen> {
   @override
   Widget build(BuildContext context) {
     final app = context.watch<AppState>();
-    final isAlerts = widget.section == OversightSection.alerts;
+    final isAlertsTab = _outerTab.index == 0;
+    final pendingCount = app.pendingAlerts(_alertUtility).length;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
       body: Column(
         children: [
           _header(context),
+          Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _outerTab,
+              labelColor: AppColors.adminPrimary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.adminPrimary,
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 14),
+              tabs: [
+                Tab(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Alert Queue'),
+                      const SizedBox(width: 6),
+                      _countBadge(pendingCount),
+                    ],
+                  ),
+                ),
+                const Tab(text: 'Reports'),
+              ],
+            ),
+          ),
           Expanded(
-            child: isAlerts ? _alertQueueTab(app) : _reportsTab(app),
+            child: TabBarView(
+              controller: _outerTab,
+              children: [
+                _alertQueueTab(app),
+                _reportsTab(app),
+              ],
+            ),
           ),
         ],
       ),
-      floatingActionButton: isAlerts
+      floatingActionButton: isAlertsTab
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.adminPrimary,
               foregroundColor: Colors.white,
@@ -543,11 +587,12 @@ class _AlertCard extends StatelessWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(14),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 4, color: sevColor),
-              Expanded(
+          child: IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Container(width: 4, color: sevColor),
+                Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
                   child: Row(
@@ -650,6 +695,7 @@ class _AlertCard extends StatelessWidget {
                 ),
               ),
             ],
+          ),
           ),
         ),
       ),
