@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 import '../../../theme/tokens.dart';
 import '../../auth/state/auth_state.dart';
 import '../../leakage/state/app_state.dart';
-import 'my_reports_screen.dart';
+import '../models/utility_entry.dart';
+import '../state/usage_state.dart';
+import '../widgets/add_consumption_sheet.dart';
 
 class CustomerHomeScreen extends StatelessWidget {
   final VoidCallback? onUsageTap;
@@ -15,31 +17,18 @@ class CustomerHomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final role = context.watch<RoleState>();
     final app = context.watch<AppState>();
-    final email = role.email ?? '';
-    final displayName = email.isEmpty
-        ? 'there'
-        : email.split('@').first.replaceAll('.', ' ').replaceAllMapped(
-              RegExp(r'\b\w'),
-              (m) => m.group(0)!.toUpperCase(),
-            );
+    final usage = context.watch<UsageState>();
+    final displayName = role.displayName;
 
-    final resolved = app.solvedAlerts();
-    final reviewedIds = app.reviewedAlertIds(email);
-    final pendingCount =
-        resolved.where((a) => !reviewedIds.contains(a.id)).length;
     final summary = app.latestSummary;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
+      floatingActionButton: const AddConsumptionFab(),
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
           _greetingHeader(context, displayName),
-          if (pendingCount > 0)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-              child: _pendingReviewBanner(context, pendingCount),
-            ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
             child: _statusBanner(),
@@ -48,7 +37,7 @@ class CustomerHomeScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: GestureDetector(
               onTap: onUsageTap,
-              child: _myUsageCard(),
+              child: _myUsageCard(usage),
             ),
           ),
           if (summary != null)
@@ -59,11 +48,15 @@ class CustomerHomeScreen extends StatelessWidget {
             ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            child: _trendCard(),
+            child: _stateSelector(context, usage),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
-            child: _billCard(),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: _trendCardFor(usage, UtilityType.water),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: _trendCardFor(usage, UtilityType.electricity),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -81,6 +74,7 @@ class CustomerHomeScreen extends StatelessWidget {
               bg: AppColors.waterSurface,
               name: 'Water Meter',
               serial: 'WM-20482',
+              active: usage.hasCurrentMonthEntry(UtilityType.water),
             ),
           ),
           Padding(
@@ -91,9 +85,10 @@ class CustomerHomeScreen extends StatelessWidget {
               bg: AppColors.electricitySurface,
               name: 'Smart Meter',
               serial: 'SM-10921',
+              active: usage.hasCurrentMonthEntry(UtilityType.electricity),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 88),
         ],
       ),
     );
@@ -105,6 +100,7 @@ class CustomerHomeScreen extends StatelessWidget {
     required Color bg,
     required String name,
     required String serial,
+    required bool active,
   }) {
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -143,69 +139,15 @@ class CustomerHomeScreen extends StatelessWidget {
               ],
             ),
           ),
-          const Text(
-            'Active',
+          Text(
+            active ? 'Active' : 'Pending',
             style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: AppColors.success,
+              color: active ? AppColors.success : AppColors.textTertiary,
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _pendingReviewBanner(BuildContext context, int count) {
-    return GestureDetector(
-      onTap: () => Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const MyReportsScreen())),
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFFFF7ED),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-              color: AppColors.warning.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Icon(Icons.star_outline,
-                  color: Color(0xFFC2410C), size: 18),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$count repair${count > 1 ? "s" : ""} awaiting your review',
-                    style: const TextStyle(
-                      color: Color(0xFFC2410C),
-                      fontWeight: FontWeight.w800,
-                      fontSize: 14,
-                    ),
-                  ),
-                  const Text(
-                    'Tap to rate the service quality',
-                    style: TextStyle(
-                        color: Color(0xFF9A3412), fontSize: 12),
-                  ),
-                ],
-              ),
-            ),
-            const Icon(Icons.chevron_right,
-                color: Color(0xFFC2410C), size: 20),
-          ],
-        ),
       ),
     );
   }
@@ -274,81 +216,110 @@ class CustomerHomeScreen extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
       child: SafeArea(
         bottom: false,
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.18),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(Icons.person_outline,
-                  color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Good morning,',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 14,
-                    ),
-                  ),
-                  Text(
-                    name,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Stack(
-              clipBehavior: Clip.none,
+            Row(
               children: [
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: Colors.white.withValues(alpha: 0.18),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.notifications_outlined,
-                      color: Colors.white, size: 20),
+                  child: const Icon(Icons.person_outline,
+                      color: Colors.white, size: 24),
                 ),
-                Positioned(
-                  top: -2,
-                  right: -2,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 5, vertical: 1),
-                    decoration: BoxDecoration(
-                      color: AppColors.critical,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                          color: AppColors.adminPrimary, width: 1.5),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Good morning,',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.notifications_outlined,
+                          color: Colors.white, size: 20),
                     ),
-                    child: const Text(
-                      '2',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
+                    Positioned(
+                      top: -2,
+                      right: -2,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.critical,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(
+                              color: AppColors.adminPrimary, width: 1.5),
+                        ),
+                        child: const Text(
+                          '2',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
+                  onPressed: () => context.read<RoleState>().logout(),
                 ),
               ],
             ),
-            IconButton(
-              icon: const Icon(Icons.logout, color: Colors.white70, size: 20),
-              onPressed: () => context.read<RoleState>().logout(),
+            const SizedBox(height: 14),
+            Material(
+              color: Colors.white.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(999),
+                onTap: () => showAddConsumptionFlow(context),
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, size: 18, color: Colors.white),
+                      SizedBox(width: 6),
+                      Text('Add +',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14)),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -404,7 +375,8 @@ class CustomerHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _myUsageCard() {
+  Widget _myUsageCard(UsageState usage) {
+    final monthLabel = _monthLabel(DateTime.now());
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -414,9 +386,9 @@ class CustomerHomeScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                SectionLabel('MY USAGE · JUL 2025'),
-                Icon(Icons.chevron_right,
+              children: [
+                SectionLabel('MY USAGE · ${monthLabel.toUpperCase()}'),
+                const Icon(Icons.chevron_right,
                     color: AppColors.textTertiary, size: 20),
               ],
             ),
@@ -426,29 +398,11 @@ class CustomerHomeScreen extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: _usageCell(
-                    icon: Icons.water_drop_outlined,
-                    color: AppColors.waterAccent,
-                    bg: AppColors.waterSurface,
-                    label: 'WATER',
-                    value: '14.8',
-                    unit: 'm³ this month',
-                    trend: '-3.3% vs Jun',
-                    trendPositive: true,
-                  ),
+                  child: _usageCell(usage, UtilityType.water),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: _usageCell(
-                    icon: Icons.electric_bolt_outlined,
-                    color: AppColors.electricityAccent,
-                    bg: AppColors.electricitySurface,
-                    label: 'ELECTRICITY',
-                    value: '10.8',
-                    unit: 'kWh this month',
-                    trend: '-5.3% vs Jun',
-                    trendPositive: true,
-                  ),
+                  child: _usageCell(usage, UtilityType.electricity),
                 ),
               ],
             ),
@@ -458,17 +412,25 @@ class CustomerHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _usageCell({
-    required IconData icon,
-    required Color color,
-    required Color bg,
-    required String label,
-    required String value,
-    required String unit,
-    required String trend,
-    required bool trendPositive,
-  }) {
-    final trendColor = trendPositive ? AppColors.success : AppColors.critical;
+  Widget _usageCell(UsageState usage, UtilityType utility) {
+    final color = utility == UtilityType.water
+        ? AppColors.waterAccent
+        : AppColors.electricityAccent;
+    final bg = utility == UtilityType.water
+        ? AppColors.waterSurface
+        : AppColors.electricitySurface;
+    final icon = utility == UtilityType.water
+        ? Icons.water_drop_outlined
+        : Icons.electric_bolt_outlined;
+
+    final current = usage.currentMonthEntry(utility);
+    final percent = usage.percentVsLastMonth(utility);
+    final hasTrend = percent != null;
+    final trendPositive = hasTrend && percent <= 0;
+    final trendColor = hasTrend
+        ? (trendPositive ? AppColors.success : AppColors.critical)
+        : AppColors.textTertiary;
+
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -483,7 +445,7 @@ class CustomerHomeScreen extends StatelessWidget {
               Icon(icon, color: color, size: 16),
               const SizedBox(width: 4),
               Text(
-                label,
+                utility.label.toUpperCase(),
                 style: TextStyle(
                   color: color,
                   fontWeight: FontWeight.w800,
@@ -495,7 +457,7 @@ class CustomerHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            value,
+            current == null ? 'N/A' : current.value.toStringAsFixed(1),
             style: const TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w800,
@@ -505,7 +467,7 @@ class CustomerHomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 2),
           Text(
-            unit,
+            current == null ? 'no reading yet' : '${utility.unit} this month',
             style: const TextStyle(
               fontSize: 12,
               color: AppColors.textSecondary,
@@ -515,17 +477,26 @@ class CustomerHomeScreen extends StatelessWidget {
           Row(
             children: [
               Icon(
-                trendPositive ? Icons.trending_down : Icons.trending_up,
+                hasTrend
+                    ? (trendPositive
+                        ? Icons.trending_down
+                        : Icons.trending_up)
+                    : Icons.remove,
                 size: 14,
                 color: trendColor,
               ),
               const SizedBox(width: 4),
-              Text(
-                trend,
-                style: TextStyle(
-                  color: trendColor,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
+              Expanded(
+                child: Text(
+                  hasTrend
+                      ? '${percent.toStringAsFixed(1)}% vs last month'
+                      : 'No prior month',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: trendColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
                 ),
               ),
             ],
@@ -535,10 +506,79 @@ class CustomerHomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _trendCard() {
-    final months = ['Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-    final water = [16.2, 15.8, 15.4, 15.4, 15.3, 14.8];
-    final elec = [12.5, 12.0, 11.6, 11.4, 11.4, 10.8];
+  Widget _stateSelector(BuildContext context, UsageState usage) {
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          const Icon(Icons.account_balance_outlined,
+              size: 18, color: AppColors.textSecondary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Compared against government average for',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (!usage.hasProfileState)
+                  const Text(
+                    'Set your service address in Profile to personalize this',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: AppColors.textTertiary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            usage.selectedState,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _trendCardFor(UsageState usage, UtilityType utility) {
+    final accent = utility == UtilityType.water
+        ? AppColors.waterAccent
+        : AppColors.electricityAccent;
+    final months = _lastSixMonths();
+    final labels = months.map(_monthLabel).toList();
+    final userSeries = _monthlySeries(usage, utility, months);
+
+    // Only show a government point for months the user actually logged.
+    final govSeries = List<double?>.generate(months.length, (i) {
+      if (userSeries[i] == null) return null;
+      return usage.governmentMonthlyValue(utility, months[i]);
+    });
+
+    final baselineYear = utility == UtilityType.water
+        ? usage.waterBaselineYear
+        : usage.electricityBaselineYear;
+    final hasGovData = govSeries.any((v) => v != null);
+
+    final allValues =
+        [...userSeries, ...govSeries].whereType<double>().toList();
+    final minY = allValues.isEmpty
+        ? 0.0
+        : (allValues.reduce((a, b) => a < b ? a : b) * 0.85);
+    final maxY = allValues.isEmpty
+        ? 10.0
+        : (allValues.reduce((a, b) => a > b ? a : b) * 1.15);
 
     return AppCard(
       child: Column(
@@ -547,113 +587,159 @@ class CustomerHomeScreen extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SectionLabel('6-MONTH TREND'),
-              Row(
+              SectionLabel('${utility.label.toUpperCase()} · 6-MONTH TREND'),
+              Wrap(
+                spacing: 12,
                 children: [
-                  _legendDot(AppColors.waterAccent, 'Water'),
-                  const SizedBox(width: 12),
-                  _legendDot(AppColors.electricityAccent, 'Elec.'),
+                  _legendDot(accent, 'You'),
+                  if (hasGovData)
+                    _legendDot(
+                        AppColors.textTertiary, 'Govt · $baselineYear'),
                 ],
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          SizedBox(
-            height: 160,
-            child: LineChart(
-              LineChartData(
-                minY: 8,
-                maxY: 18,
-                titlesData: FlTitlesData(
-                  leftTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  rightTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  topTitles: const AxisTitles(
-                      sideTitles: SideTitles(showTitles: false)),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 22,
-                      interval: 1,
-                      getTitlesWidget: (v, meta) {
-                        final i = v.round();
-                        if (i < 0 || i >= months.length || i != v) {
-                          return const SizedBox.shrink();
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 6),
-                          child: Text(
-                            months[i],
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textTertiary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                gridData: const FlGridData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    color: AppColors.waterAccent,
-                    barWidth: 3,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, _, __, ___) =>
-                          FlDotCirclePainter(
-                        radius: 4,
-                        color: AppColors.waterAccent,
-                        strokeWidth: 0,
-                      ),
-                      checkToShowDot: (spot, bar) =>
-                          spot.x == bar.spots.last.x,
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color: AppColors.waterAccent.withValues(alpha: 0.15),
-                    ),
-                    spots: [
-                      for (int i = 0; i < water.length; i++)
-                        FlSpot(i.toDouble(), water[i]),
-                    ],
-                  ),
-                  LineChartBarData(
-                    isCurved: true,
-                    color: AppColors.electricityAccent,
-                    barWidth: 3,
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, _, __, ___) =>
-                          FlDotCirclePainter(
-                        radius: 4,
-                        color: AppColors.electricityAccent,
-                        strokeWidth: 0,
-                      ),
-                      checkToShowDot: (spot, bar) =>
-                          spot.x == bar.spots.last.x,
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      color:
-                          AppColors.electricityAccent.withValues(alpha: 0.12),
-                    ),
-                    spots: [
-                      for (int i = 0; i < elec.length; i++)
-                        FlSpot(i.toDouble(), elec[i]),
-                    ],
-                  ),
-                ],
-              ),
+          const SizedBox(height: 2),
+          Text(
+            'measured in ${utility.unit}',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppColors.textTertiary,
+              fontStyle: FontStyle.italic,
             ),
           ),
+          const SizedBox(height: 12),
+          if (allValues.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Text(
+                  'No readings yet — tap "Add +" to log your first month.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 150,
+              child: LineChart(
+                LineChartData(
+                  minY: minY,
+                  maxY: maxY,
+                  titlesData: FlTitlesData(
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 40,
+                        getTitlesWidget: (v, meta) {
+                          if (v == meta.min || v == meta.max) {
+                            return const SizedBox.shrink();
+                          }
+                          return Text(
+                            v.toStringAsFixed(0),
+                            style: const TextStyle(
+                              fontSize: 10,
+                              color: AppColors.textTertiary,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        interval: 1,
+                        getTitlesWidget: (v, meta) {
+                          final i = v.round();
+                          if (i < 0 || i >= labels.length || i != v) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              labels[i],
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  gridData: const FlGridData(show: false),
+                  lineBarsData: [
+                    _lineSeries(userSeries, accent),
+                    if (hasGovData)
+                      _lineSeries(govSeries, AppColors.textTertiary,
+                          dashed: true),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  LineChartBarData _lineSeries(List<double?> values, Color color,
+      {bool dashed = false}) {
+    final spots = <FlSpot>[];
+    for (var i = 0; i < values.length; i++) {
+      final v = values[i];
+      if (v != null) spots.add(FlSpot(i.toDouble(), v));
+    }
+    return LineChartBarData(
+      isCurved: true,
+      color: color,
+      barWidth: dashed ? 2 : 3,
+      dashArray: dashed ? [6, 4] : null,
+      dotData: FlDotData(
+        show: true,
+        getDotPainter: (spot, _, __, ___) => FlDotCirclePainter(
+          radius: dashed ? 3 : 4,
+          color: color,
+          strokeWidth: 0,
+        ),
+      ),
+      belowBarData: BarAreaData(
+        show: !dashed,
+        color: color.withValues(alpha: 0.12),
+      ),
+      spots: spots,
+    );
+  }
+
+  List<double?> _monthlySeries(
+      UsageState usage, UtilityType utility, List<DateTime> months) {
+    return months
+        .map((month) => usage.entryForMonth(utility, month)?.value)
+        .toList();
+  }
+
+  List<DateTime> _lastSixMonths() {
+    final now = DateTime.now();
+    return List.generate(6, (i) {
+      final monthsAgo = 5 - i;
+      return DateTime(now.year, now.month - monthsAgo, 1);
+    });
+  }
+
+  String _monthLabel(DateTime d) {
+    const names = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return names[d.month - 1];
   }
 
   Widget _legendDot(Color color, String label) {
@@ -673,57 +759,6 @@ class CustomerHomeScreen extends StatelessWidget {
               fontWeight: FontWeight.w500,
             )),
       ],
-    );
-  }
-
-  Widget _billCard() {
-    return AppCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Estimated Bill · Jul 2025',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.textSecondary,
-                    )),
-                const SizedBox(height: 4),
-                const Text('RM 78.40',
-                    style: TextStyle(
-                      fontSize: 34,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
-                      height: 1.1,
-                    )),
-                const SizedBox(height: 4),
-                Text('Due 31 Jul 2025',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.warning,
-                      fontWeight: FontWeight.w700,
-                    )),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.successSurface,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: const Text(
-              'Due 31 Jul 2025',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.success,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 

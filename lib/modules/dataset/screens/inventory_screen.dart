@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/tokens.dart';
@@ -259,7 +258,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
         children: [
           _chip('All ($total)', 'All'),
           const SizedBox(width: 8),
-          _chip('Water ($water)', 'Water', icon: LucideIcons.droplets),
+          _chip('Water ($water)', 'Water', icon: Icons.water_drop_outlined),
           const SizedBox(width: 8),
           _chip('Electricity ($elec)', 'Electricity',
               icon: Icons.electric_bolt_outlined),
@@ -386,7 +385,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
-                          isWater ? LucideIcons.droplets : Icons.electric_bolt,
+                          isWater ? Icons.water_drop_outlined : Icons.electric_bolt,
                           color: accent,
                         ),
                       ),

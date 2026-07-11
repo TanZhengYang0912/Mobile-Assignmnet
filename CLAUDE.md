@@ -7,7 +7,7 @@
 - **Team:** BMIT2073 Mobile Application Development assignment
 - **Platform:** Android & iOS (Flutter)
 - **Cloud:** Supabase (PostgreSQL)
-- **Status:** 4 modules, mostly complete (Modules 1, 3, 4 active; Module 2 placeholder)
+- **Status:** 4 modules, all active. Restructured into a 3-role system (Admin / Worker / Customer) with a dedicated `modules/admin` folder; Module 2 (Personal Usage) is now fully built out (no longer a placeholder); Module 4 (Electricity) was merged/mirrored into `modules/admin` and `modules/leakage` rather than staying standalone.
 
 ---
 
@@ -39,37 +39,49 @@
 
 ```
 lib/
-├── main.dart                          SHARED (entry point, app shell, providers)
+├── main.dart                          SHARED (entry point, MySumberApp, role-based AppShell, providers)
+├── config.example.dart                Template for Groq API key (copy → config.dart, gitignored)
+├── theme/
+│   └── tokens.dart                    Shared AppColors + role/utility color helpers (Figma design tokens)
 └── modules/
-    ├── auth/                          Module 0: Role Selection (Admin/Consumer)
+    ├── auth/                          Module 0: Landing + role-aware login/register
     │   ├── screens/
-    │   │   └── role_selection_screen.dart
+    │   │   ├── landing_screen.dart        3 role buttons (Admin/Worker/Customer)
+    │   │   ├── login_screen.dart          Single login screen, themed per role
+    │   │   └── register_screen.dart       Customer sign-up only
     │   └── state/
-    │       └── auth_state.dart
+    │       └── auth_state.dart            RoleState (Supabase auth + hardcoded email→role map)
     │
-    ├── dataset/                       Module 1: Equipment Management
+    ├── admin/                         Admin-only screens (new role surface)
+    │   └── screens/
+    │       ├── abnormal_production_screen.dart
+    │       ├── admin_alert_detail_screen.dart
+    │       ├── oversight_screen.dart
+    │       └── review_management_screen.dart
+    │
+    ├── dataset/                       Module 1: Equipment Management (admin)
     │   ├── data/                      CSV parsing & dataset repository
     │   ├── models/                    Dataset, Node, Equipment classes
-    │   ├── screens/                   Dashboard & detail screens
+    │   ├── screens/                   Dashboard, inventory, detail screens
     │   ├── services/                  Anomaly detection
     │   └── state/                     DatasetState (Provider)
     │
-    ├── usage/                         Module 2: Personal Usage Comparison
-    │   └── screens/
-    │       └── work_in_progress_screen.dart
+    ├── usage/                         Module 2: Personal Usage Comparison (customer) — now fully built
+    │   ├── screens/
+    │   │   ├── customer_home_screen.dart
+    │   │   ├── compare_usage_screen.dart
+    │   │   ├── my_reports_screen.dart
+    │   │   ├── notifications_screen.dart
+    │   │   └── report_problem_screen.dart
+    │   └── services/
+    │       └── electricity_baseline_service.dart
     │
-    ├── leakage/                       Module 3: Water Leakage Detection
-    │   ├── data/                      LeakageRepository (Supabase CRUD)
-    │   ├── models/                    Alert, Reading, Report
-    │   ├── screens/                   Home, reports, alert queue
-    │   ├── services/                  Detection, baseline, explainer
-    │   └── state/                     AppState (Provider)
-    │
-    └── electricity/                   Module 4: Electricity Anomalies
-        ├── models/                    Electricity data classes
-        ├── screens/                   Dashboard
-        ├── services/                  ElectricityDataService
-        └── state/                     ElectricityState (Provider)
+    └── leakage/                       Module 3: Water Leakage Detection (worker) — also carries electricity loss logic
+        ├── data/                      LeakageRepository (Supabase CRUD)
+        ├── models/                    Alert, Reading, Report, AiSummary, ServiceReview
+        ├── screens/                   Home, alert queue/detail/evidence, reports
+        ├── services/                  Detection, baseline, explainer, NRW, simulation, electricity_loss_service
+        └── state/                     AppState (Provider)
 
 assets/
 ├── water_consumption.csv              Government reference data
@@ -78,17 +90,21 @@ assets/
 └── electricity_supply.csv
 ```
 
+> Note: standalone `modules/electricity` (Module 4) screens/state were removed — electricity anomaly detection is now folded into `modules/admin` (oversight/abnormal production) and `modules/leakage` (electricity_loss_service), rather than a separate dashboard.
+
 ---
 
 ## Module Breakdown
 
 | Module | Owner | Purpose | Storage | Status |
 |--------|-------|---------|---------|--------|
-| 0. Auth | Assigned | Role selection (Admin/Consumer) | In-memory | ✅ Complete |
+| 0. Auth | Assigned | Landing + role-based login (Admin/Worker/Customer) | Supabase auth | ✅ Complete |
+| Admin | Chun Jie Tan | Oversight, abnormal production, review management | Local CSV + Supabase | ✅ Active |
 | 1. Equipment | Chun Jie Tan | Dataset management & state variance | Local CSV | ✅ Active |
-| 2. Comparison | Unassigned | Household vs. state usage | Local CSV | 🔧 Placeholder |
-| 3. Leakage | Worker X | Water anomaly detection | Supabase + CSV | ✅ Active |
-| 4. Electricity | Chun Jie Tan | Meter tampering detection | Local CSV | ✅ Active |
+| 2. Comparison | Unassigned | Household vs. state usage, reports, notifications | Local CSV | ✅ Active (built out) |
+| 3. Leakage | Worker X | Water anomaly detection + electricity loss | Supabase + CSV | ✅ Active |
+
+> Module 4 (Electricity) no longer exists as a standalone module — its logic was merged into Admin (`abnormal_production_screen.dart`, `oversight_screen.dart`) and Leakage (`electricity_loss_service.dart`).
 
 ---
 
@@ -103,7 +119,12 @@ fl_chart: ^1.2.0          # Charts
 supabase_flutter: ^2.9.0  # Cloud backend
 intl: ^0.20.2             # Date/number formatting
 uuid: ^4.5.3              # Unique IDs
+lucide_icons: ^0.257.0    # Icon set (Figma parity)
+http: ^1.2.0              # Groq API calls (AI summaries)
 ```
+
+### AI Summaries (Groq)
+`modules/leakage/state/app_state.dart` calls the Groq API for AI-generated alert summaries. The key is read from `lib/config.dart` (gitignored) — copy `lib/config.example.dart` → `lib/config.dart` and paste a free key from console.groq.com. Never commit `config.dart`.
 
 ### Development
 ```yaml
@@ -191,78 +212,75 @@ No cloud dependency. All data processed locally; findings stored in Provider sta
 
 ## Module 0: Authentication System
 
-### Initial Screen: Role Selection
+### Initial Screen: Landing (role picker)
 ```
 ┌────────────────────────────────────┐
 │          mySumber                   │
-│  Water & Electricity Anomaly        │
-│  Detection                          │
+│  Utility Management Platform        │
 │                                     │
-│  [Admin Login] [Consumer Login]     │
+│  [Continue as Admin]                │
+│  [Continue as Worker]               │
+│  [Continue as Customer]             │
 └────────────────────────────────────┘
 ```
+Each button forwards to a single shared `LoginScreen`, themed by role color and (for admin/worker) prefilled with the known staff email.
 
-### Admin Login
-- **Password:** `admin` (hardcoded local check)
-- No email required
-- Single administrator account
-- Access modules: 1 (Equipment), 3 (Leakage), 4 (Electricity)
+### Login (all roles, one screen)
+There is **no separate admin password path anymore**. Every role — including admin and worker — authenticates through Supabase email + password (`RoleState.login`). Role is then resolved client-side from a hardcoded email lookup in `lib/modules/auth/state/auth_state.dart`:
+```dart
+const _staffRoles = {
+  'admin@mysumber.my': 'admin',
+  'worker@mysumber.my': 'worker',
+};
+// any other authenticated email resolves to 'user' (customer)
+```
+This means the Supabase project must actually contain accounts for `admin@mysumber.my` and `worker@mysumber.my` for those roles to work — there is no local/offline admin bypass.
 
-### Consumer Login / Registration
-**Registration flow:**
-1. Email + Password (min 8 characters)
-2. Confirm password + agree to terms
-3. Submit → Supabase sends verification email
-4. User verifies email (click link in email)
-5. Account created + auto-login → Consumer dashboard
+### Customer Registration
+1. Email + Password (min 8 characters) + confirm password + agree to terms (`register_screen.dart`)
+2. Submit → Supabase `signUp`, then immediate `signInWithPassword` → role resolves to `user` → auto-login into customer dashboard
+3. Accessible only from the Customer login screen ("Sign Up" link) — admin/worker screens have no registration option
 
-**Login flow:**
-1. Email + Password
-2. Submit → Authenticate via Supabase
-3. If valid → Auto-login → Consumer dashboard
-
-**Consumer access:** Module 2 (Personal Usage) only
+**Role access after login (`AppShell` in `main.dart`):**
+- **Admin:** Dashboard, Inventory, Abnormal Production (alerts), Oversight, Review Management
+- **Worker:** Home Screen (Water), Home Screen (Electricity) — both backed by `modules/leakage`
+- **Customer (`user`):** Customer Home, Compare Usage, Report Problem
 
 ### Error Handling
-- Invalid admin password: "Invalid password"
-- Email already registered: Shows Supabase error
-- Weak password: Shows error (< 8 characters)
-- Wrong login credentials: Shows error
+- Supabase auth errors (bad credentials, unregistered email, etc.) surface via `RoleState.errorMessage`
+- Weak password: Shows error (< 8 characters) — checked client-side before submit in `register_screen.dart`
+- Passwords must match on registration
 - Invalid email format: Validated before submission
-
-### AppBar with Logout
-Once logged in:
-- Title: `mySumber - ADMIN` or `mySumber - CONSUMER`
-- Logout button (top right)
-- Click logout → Signs out (Supabase for consumers, local for admin) → Returns to role selection
 
 ### State Management
 ```dart
-RoleState (Provider)
-├── _userRole: "admin" | "consumer" | null
-├── _consumerEmail: String? (consumer only)
+RoleState (Provider) — lib/modules/auth/state/auth_state.dart
+├── _userRole: "admin" | "worker" | "user" | null   (resolved from email, not stored separately)
+├── _email: String?
 ├── isLoggedIn: bool
+├── isLoading: bool
 ├── errorMessage: String?
-├── adminLogin(password): Future<bool>
-├── consumerLogin(email, password): Future<bool>
-├── consumerRegister(email, password): Future<bool>
-├── checkExistingSession(): void (checks on app start)
+├── login(email, password): Future<bool>
+├── register(email, password): Future<bool>
+├── checkExistingSession(): Future<void>   (checks Supabase session on app start)
 └── logout(): Future<void>
 ```
 
-**Persistence:**
-- Admin: No persistence (session ends when app closes)
-- Consumer: Supabase manages session (persists until logout)
+**Persistence:** Supabase manages the session for all roles (persists until logout), including admin/worker — this is a change from the old local-only admin session.
 
 ---
 
-## Module 2: Personal Usage Comparison (Placeholder)
+## Module 2: Personal Usage Comparison
 
-**Current status:** Placeholder screen with "Module 2 - Work in progress" text.
+**Current status:** Fully built (no longer the placeholder screen). Lives under `lib/modules/usage/` and is the customer-role tab set in `AppShell`:
+- `customer_home_screen.dart` — customer landing/dashboard
+- `compare_usage_screen.dart` — household vs. state usage comparison
+- `my_reports_screen.dart` — customer's submitted reports history
+- `notifications_screen.dart` — customer notifications
+- `report_problem_screen.dart` — submit a new report (leakage/anomaly)
+- `services/electricity_baseline_service.dart` — baseline calc reused for the comparison view
 
-**To implement:** Follow the specifications in the Architecture Overview section above (Input form → Comparison chart → Recommendations).
-
-**When ready to build:** Replace `work_in_progress_screen.dart` with actual screens while keeping the route and Provider setup unchanged.
+`work_in_progress_screen.dart` was removed entirely.
 
 ---
 

@@ -21,6 +21,78 @@ class RoleState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
 
+  Map<String, dynamic>? get _metadata =>
+      Supabase.instance.client.auth.currentUser?.userMetadata;
+
+  /// Custom display name if the user has set one (Profile tab), otherwise
+  /// derived from their email's local part.
+  String get displayName {
+    final custom = _metadata?['display_name'] as String?;
+    if (custom != null && custom.trim().isNotEmpty) return custom.trim();
+    final email = _email ?? '';
+    if (email.isEmpty) return 'there';
+    return email.split('@').first.replaceAll('.', ' ').replaceAllMapped(
+          RegExp(r'\b\w'),
+          (m) => m.group(0)!.toUpperCase(),
+        );
+  }
+
+  String? get phoneNumber => _metadata?['phone_number'] as String?;
+  String? get gender => _metadata?['gender'] as String?;
+
+  /// Persists any combination of display name, phone number, and gender to
+  /// the Supabase auth user's metadata and notifies listeners so every
+  /// screen using [displayName]/[phoneNumber]/[gender] refreshes.
+  Future<bool> updateProfile({
+    String? displayName,
+    String? phoneNumber,
+    String? gender,
+  }) async {
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {
+          if (displayName != null) 'display_name': displayName,
+          if (phoneNumber != null) 'phone_number': phoneNumber,
+          if (gender != null) 'gender': gender,
+        }),
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Could not update profile: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Persists the full profile collected by the post-registration setup
+  /// wizard in a single write.
+  Future<bool> completeProfileSetup({
+    required String displayName,
+    required String gender,
+    required String phoneNumber,
+    required String serviceAddress,
+    required String serviceState,
+  }) async {
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(data: {
+          'display_name': displayName,
+          'gender': gender,
+          'phone_number': phoneNumber,
+          'service_address': serviceAddress,
+          'service_state': serviceState,
+        }),
+      );
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _errorMessage = 'Could not save profile: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
   String _resolveRole(String? email) =>
       _staffRoles[email?.toLowerCase()] ?? 'user';
 

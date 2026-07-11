@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../theme/tokens.dart';
 import '../../auth/state/auth_state.dart';
 import '../../leakage/screens/network_error.dart';
 import '../../leakage/services/simulation_service.dart';
 import '../../leakage/state/app_state.dart';
+import '../state/usage_state.dart';
+import '../widgets/edit_address_dialog.dart';
+import '../widgets/edit_profile_dialog.dart';
+
+const _defaultServiceAddress = 'No. 12, Jln Merdeka, Selangor';
+const _defaultServiceState = 'Selangor';
 
 class ReportProblemScreen extends StatefulWidget {
   const ReportProblemScreen({super.key});
@@ -16,17 +23,47 @@ class ReportProblemScreen extends StatefulWidget {
 
 class _ReportProblemScreenState extends State<ReportProblemScreen> {
   bool _pushNotifications = true;
+  late String _serviceAddress;
+  late String _serviceState;
+
+  @override
+  void initState() {
+    super.initState();
+    final metadata = Supabase.instance.client.auth.currentUser?.userMetadata;
+    _serviceAddress =
+        (metadata?['service_address'] as String?) ?? _defaultServiceAddress;
+    _serviceState =
+        (metadata?['service_state'] as String?) ?? _defaultServiceState;
+  }
+
+  Future<void> _editAddress() async {
+    final result = await showEditServiceAddressDialog(
+      context,
+      initialAddress: _serviceAddress,
+    );
+    if (result != null && mounted) {
+      setState(() {
+        _serviceAddress = result.address;
+        _serviceState = result.state;
+      });
+      context.read<UsageState>().selectState(result.state);
+    }
+  }
+
+  Future<void> _editProfile(RoleState role) async {
+    await showEditProfileDialog(
+      context,
+      initialName: role.displayName,
+      initialPhone: role.phoneNumber,
+      initialGender: role.gender,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final role = context.watch<RoleState>();
     final email = role.email ?? '';
-    final displayName = email.isEmpty
-        ? 'Account Holder'
-        : email.split('@').first.replaceAll('.', ' ').replaceAllMapped(
-              RegExp(r'\b\w'),
-              (m) => m.group(0)!.toUpperCase(),
-            );
+    final displayName = role.displayName;
     final initials = displayName
         .split(' ')
         .where((s) => s.isNotEmpty)
@@ -42,11 +79,12 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           _header(context),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-            child: _profileCard(displayName, email, initials),
+            child: _profileCard(
+                displayName, email, initials, role.phoneNumber),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-            child: _detailsCard(),
+            child: _detailsCard(_serviceAddress, _serviceState, role),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -163,8 +201,10 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     );
   }
 
-  Widget _profileCard(String name, String email, String initials) {
+  Widget _profileCard(
+      String name, String email, String initials, String? phone) {
     return AppCard(
+      onTap: () => _editProfile(context.read<RoleState>()),
       child: Row(
         children: [
           Container(
@@ -207,9 +247,9 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                   ),
                 ),
                 const SizedBox(height: 2),
-                const Text(
-                  '+60 12-345 6789',
-                  style: TextStyle(
+                Text(
+                  phone == null || phone.isEmpty ? 'Add phone number' : phone,
+                  style: const TextStyle(
                     fontSize: 13,
                     color: AppColors.textSecondary,
                   ),
@@ -217,12 +257,15 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ],
             ),
           ),
+          const Icon(Icons.edit_outlined,
+              size: 16, color: AppColors.textTertiary),
         ],
       ),
     );
   }
 
-  Widget _detailsCard() {
+  Widget _detailsCard(
+      String serviceAddress, String serviceState, RoleState role) {
     return AppCard(
       padding: EdgeInsets.zero,
       child: Column(
@@ -230,7 +273,25 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
           _detailRow(
             icon: Icons.location_on_outlined,
             label: 'Service Address',
-            value: 'No. 12, Jln Merdeka, Selangor',
+            value: serviceAddress,
+            onTap: _editAddress,
+            trailing: const Icon(Icons.edit_outlined,
+                size: 16, color: AppColors.textTertiary),
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _detailRow(
+            icon: Icons.map_outlined,
+            label: 'State',
+            value: serviceState,
+          ),
+          const Divider(height: 1, indent: 16, endIndent: 16),
+          _detailRow(
+            icon: Icons.wc_outlined,
+            label: 'Gender',
+            value: role.gender ?? 'Not set',
+            onTap: () => _editProfile(role),
+            trailing: const Icon(Icons.edit_outlined,
+                size: 16, color: AppColors.textTertiary),
           ),
           const Divider(height: 1, indent: 16, endIndent: 16),
           _detailRow(
@@ -249,9 +310,14 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     );
   }
 
-  Widget _detailRow(
-      {required IconData icon, required String label, required String value}) {
-    return Padding(
+  Widget _detailRow({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    final row = Padding(
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -274,9 +340,15 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
               ],
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing,
+          ],
         ],
       ),
     );
+    if (onTap == null) return row;
+    return InkWell(onTap: onTap, child: row);
   }
 
   Widget _menuCard() {

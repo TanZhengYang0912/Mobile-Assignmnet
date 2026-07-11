@@ -11,6 +11,9 @@ class ElectricityBaselineService {
   static const _sector = 'local_domestic';
 
   final Map<String, double> _perCapitaKwhPerDay = {};
+  int _latestYear = 0;
+
+  int get latestYear => _latestYear;
 
   List<String> get states {
     final list = _perCapitaKwhPerDay.keys.toList()..sort();
@@ -39,6 +42,7 @@ class ElectricityBaselineService {
       if (currentLatest == null || date.isAfter(currentLatest)) {
         latestDateByState[state] = date;
         latestValueByState[state] = value;
+        if (date.year > _latestYear) _latestYear = date.year;
       }
     }
 

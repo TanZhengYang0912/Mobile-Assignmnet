@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/tokens.dart';
@@ -161,7 +160,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: StatCell(
-              icon: LucideIcons.serverCrash,
+              icon: Icons.dns_outlined,
               iconColor: AppColors.critical,
               value: critical.toString(),
               label: 'Critical',
@@ -303,7 +302,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               Expanded(
                 child: _lossCallout(
-                  icon: LucideIcons.droplets,
+                  icon: Icons.water_drop_outlined,
                   color: AppColors.waterAccent,
                   bg: AppColors.waterSurface,
                   label: 'Top Water Loss',

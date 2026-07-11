@@ -1,9 +1,20 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../theme/tokens.dart';
 import '../../auth/state/auth_state.dart';
+import '../models/utility_entry.dart';
+import '../state/usage_state.dart';
+import '../widgets/add_consumption_sheet.dart';
 import 'notifications_screen.dart';
+
+const _monthNames = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+
+String _monthYearLabel(DateTime d) => '${_monthNames[d.month - 1]} ${d.year}';
 
 class CompareUsageScreen extends StatefulWidget {
   const CompareUsageScreen({super.key});
@@ -15,50 +26,6 @@ class CompareUsageScreen extends StatefulWidget {
 class _CompareUsageScreenState extends State<CompareUsageScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tab;
-
-  final _waterDaily = const [
-    14.2, 15.1, 13.6, 16.4, 14.8, 15.9, 17.1,
-    14.3, 15.5, 14.7, 16.0, 17.4, 15.2, 16.8,
-    13.9, 15.0, 14.5, 15.8, 16.2, 14.1, 15.7,
-    16.5, 14.4, 15.3, 17.0, 14.9, 15.6, 16.1,
-    14.6, 15.9, 16.7,
-  ];
-  final _elecDaily = const [
-    9.8, 11.4, 10.2, 12.8, 10.5, 11.0, 13.2,
-    10.1, 11.9, 10.8, 12.4, 13.5, 10.9, 12.1,
-    9.5, 11.7, 10.6, 12.3, 13.0, 10.4, 11.6,
-    12.6, 10.7, 11.3, 12.9, 10.0, 11.2, 12.5,
-    10.3, 11.8, 12.7,
-  ];
-
-  final _waterMonthly = const [
-    _MonthUsage('Jul 2025', 14.8, current: true),
-    _MonthUsage('Jun 2025', 15.3),
-    _MonthUsage('May 2025', 15.4),
-    _MonthUsage('Apr 2025', 15.1),
-    _MonthUsage('Mar 2025', 15.8),
-    _MonthUsage('Feb 2025', 16.2),
-    _MonthUsage('Jan 2025', 16.5),
-    _MonthUsage('Dec 2024', 17.1),
-    _MonthUsage('Nov 2024', 16.8),
-    _MonthUsage('Oct 2024', 15.9),
-    _MonthUsage('Sep 2024', 15.4),
-    _MonthUsage('Aug 2024', 14.9),
-  ];
-  final _elecMonthly = const [
-    _MonthUsage('Jul 2025', 10.8, current: true),
-    _MonthUsage('Jun 2025', 11.4),
-    _MonthUsage('May 2025', 11.2),
-    _MonthUsage('Apr 2025', 11.5),
-    _MonthUsage('Mar 2025', 11.9),
-    _MonthUsage('Feb 2025', 12.4),
-    _MonthUsage('Jan 2025', 12.8),
-    _MonthUsage('Dec 2024', 13.5),
-    _MonthUsage('Nov 2024', 13.2),
-    _MonthUsage('Oct 2024', 12.1),
-    _MonthUsage('Sep 2024', 11.7),
-    _MonthUsage('Aug 2024', 11.0),
-  ];
 
   @override
   void initState() {
@@ -75,59 +42,101 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
     super.dispose();
   }
 
-  bool get _isWater => _tab.index == 0;
+  UtilityType get _utility =>
+      _tab.index == 0 ? UtilityType.water : UtilityType.electricity;
 
   @override
   Widget build(BuildContext context) {
-    final currentDaily = _isWater ? _waterDaily : _elecDaily;
-    final currentMonthly = _isWater ? _waterMonthly : _elecMonthly;
-    final unit = _isWater ? 'm³' : 'kWh';
-    final accent =
-        _isWater ? AppColors.waterAccent : AppColors.electricityAccent;
-    final surface =
-        _isWater ? AppColors.waterSurface : AppColors.electricitySurface;
-    final current = currentMonthly.first;
-    final prev = currentMonthly[1];
-    final delta = ((current.value - prev.value) / prev.value * 100);
-    final avg =
-        currentMonthly.map((m) => m.value).reduce((a, b) => a + b) /
-            currentMonthly.length;
+    final usage = context.watch<UsageState>();
+    final utility = _utility;
+    final accent = utility == UtilityType.water
+        ? AppColors.waterAccent
+        : AppColors.electricityAccent;
+    final surface = utility == UtilityType.water
+        ? AppColors.waterSurface
+        : AppColors.electricitySurface;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
-      body: ListView(
-        padding: EdgeInsets.zero,
+      floatingActionButton: AddConsumptionFab(utility: utility),
+      body: usage.loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _header(context),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+                  child: _utilityTabs(accent),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+                  child: _summaryCard(usage, utility, accent, surface),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+                  child: _monthlyChart(usage, utility, accent, surface),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 6, 16, 96),
+                  child: _recordLog(usage, utility, accent),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _recordLog(UsageState usage, UtilityType utility, Color accent) {
+    final records = usage.entries(utility).toList()
+      ..sort((a, b) => b.periodMonth.compareTo(a.periodMonth));
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _header(context),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: _utilityTabs(),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const SectionLabel('RECORD LOG'),
+                Text('${records.length} entr${records.length == 1 ? 'y' : 'ies'}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    )),
+              ],
+            ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
-            child: _summaryCard(current, delta, avg, unit, accent, surface),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-            child: _dailyChart(currentDaily, unit, accent, surface),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 6, 16, 24),
-            child: _monthlyHistory(currentMonthly, unit, accent, surface),
-          ),
+          if (records.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+              child: Center(
+                child: Text(
+                  'No entries logged yet.',
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
+            )
+          else
+            for (var i = 0; i < records.length; i++) ...[
+              if (i > 0) const Divider(height: 1, indent: 16, endIndent: 16),
+              _RecordLogRow(
+                entry: records[i],
+                utility: utility,
+                accent: accent,
+              ),
+            ],
+          const SizedBox(height: 8),
         ],
       ),
     );
   }
 
   Widget _header(BuildContext context) {
-    final email = context.watch<RoleState>().email ?? '';
-    final displayName = email.isEmpty
-        ? 'there'
-        : email.split('@').first.replaceAll('.', ' ').replaceAllMapped(
-              RegExp(r'\b\w'),
-              (m) => m.group(0)!.toUpperCase(),
-            );
+    final displayName = context.watch<RoleState>().displayName;
 
     return Container(
       width: double.infinity,
@@ -224,35 +233,74 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
     );
   }
 
-  Widget _utilityTabs() {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.divider),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: _tabButton(
-              label: 'Water',
-              icon: Icons.water_drop_outlined,
-              selected: _isWater,
-              onTap: () => _tab.animateTo(0),
-              color: AppColors.waterAccent,
+  Widget _utilityTabs(Color accent) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        _sideAddButton(UtilityType.water),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.divider),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _tabButton(
+                    label: 'Water',
+                    icon: Icons.water_drop_outlined,
+                    selected: _tab.index == 0,
+                    onTap: () => _tab.animateTo(0),
+                    color: AppColors.waterAccent,
+                  ),
+                ),
+                Expanded(
+                  child: _tabButton(
+                    label: 'Electricity',
+                    icon: Icons.electric_bolt_outlined,
+                    selected: _tab.index == 1,
+                    onTap: () => _tab.animateTo(1),
+                    color: AppColors.electricityAccent,
+                  ),
+                ),
+              ],
             ),
           ),
-          Expanded(
-            child: _tabButton(
-              label: 'Electricity',
-              icon: Icons.electric_bolt_outlined,
-              selected: !_isWater,
-              onTap: () => _tab.animateTo(1),
-              color: AppColors.electricityAccent,
-            ),
+        ),
+        const SizedBox(width: 8),
+        _sideAddButton(UtilityType.electricity),
+      ],
+    );
+  }
+
+  Widget _sideAddButton(UtilityType utility) {
+    final accent = utility == UtilityType.water
+        ? AppColors.waterAccent
+        : AppColors.electricityAccent;
+    final icon = utility == UtilityType.water
+        ? Icons.water_drop_outlined
+        : Icons.electric_bolt_outlined;
+    return Material(
+      color: accent.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () => showAddConsumptionFlow(context, utility: utility),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: accent),
+              const SizedBox(width: 4),
+              Icon(Icons.add, size: 14, color: accent),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -303,15 +351,20 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
     );
   }
 
-  Widget _summaryCard(_MonthUsage current, double delta, double avg,
-      String unit, Color accent, Color surface) {
-    final trendDown = delta < 0;
+  Widget _summaryCard(UsageState usage, UtilityType utility, Color accent,
+      Color surface) {
+    final current = usage.currentMonthEntry(utility);
+    final vsLastMonth = usage.percentVsLastMonth(utility);
+    final vsAverage = usage.percentVsAverage(utility);
+    final avg = usage.average(utility);
+    final monthLabel = _monthLabel(DateTime.now());
+
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${current.label} · ${_isWater ? 'Water' : 'Electricity'} Usage',
+            '$monthLabel ${DateTime.now().year} · ${utility.label} Usage',
             style: const TextStyle(
               fontSize: 13,
               color: AppColors.textSecondary,
@@ -323,7 +376,7 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                current.value.toStringAsFixed(1),
+                current == null ? 'N/A' : current.value.toStringAsFixed(1),
                 style: const TextStyle(
                   fontSize: 40,
                   fontWeight: FontWeight.w800,
@@ -331,53 +384,56 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
                   height: 1.1,
                 ),
               ),
-              const SizedBox(width: 4),
-              Text(unit,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textSecondary,
-                  )),
+              if (current != null) ...[
+                const SizedBox(width: 4),
+                Text(utility.unit,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                    )),
+              ],
             ],
           ),
+          const SizedBox(height: 8),
+          _percentRow(
+            icon: Icons.calendar_today_outlined,
+            label: 'vs last month',
+            percent: vsLastMonth,
+          ),
           const SizedBox(height: 4),
-          Row(
-            children: [
-              Icon(trendDown ? Icons.trending_down : Icons.trending_up,
-                  size: 16,
-                  color: trendDown ? AppColors.success : AppColors.critical),
-              const SizedBox(width: 4),
-              Text(
-                '${delta.toStringAsFixed(1)}% compared to Jun',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: trendDown ? AppColors.success : AppColors.critical,
-                ),
-              ),
-            ],
+          _percentRow(
+            icon: Icons.trending_flat,
+            label: 'vs your average',
+            percent: vsAverage,
           ),
           const SizedBox(height: 14),
           Row(
             children: [
-              const Text('Monthly average',
+              const Text('Your average',
                   style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textSecondary,
                   )),
               const Spacer(),
-              Text('${avg.toStringAsFixed(1)} $unit',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w700,
-                  )),
+              Text(
+                avg == null
+                    ? 'N/A'
+                    : '${avg.toStringAsFixed(1)} ${utility.unit}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: (current.value / avg).clamp(0.0, 1.5) / 1.5,
+              value: (current == null || avg == null || avg == 0)
+                  ? 0.0
+                  : (current.value / avg).clamp(0.0, 1.5) / 1.5,
               minHeight: 8,
               backgroundColor: surface,
               valueColor: AlwaysStoppedAnimation<Color>(accent),
@@ -388,14 +444,51 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
     );
   }
 
-  Widget _dailyChart(
-      List<double> data, String unit, Color accent, Color surface) {
-    final maxV = data.reduce((a, b) => a > b ? a : b) * 1.15;
-    const barWidth = 18.0;
-    const barGap = 6.0;
-    const chartHeight = 130.0;
-    const labelHeight = 18.0;
-    const scrollbarPad = 14.0;
+  Widget _percentRow({
+    required IconData icon,
+    required String label,
+    required double? percent,
+  }) {
+    final hasValue = percent != null;
+    final improving = hasValue && percent <= 0;
+    final color = hasValue
+        ? (improving ? AppColors.success : AppColors.critical)
+        : AppColors.textTertiary;
+    return Row(
+      children: [
+        Icon(
+          hasValue
+              ? (improving ? Icons.trending_down : Icons.trending_up)
+              : Icons.remove,
+          size: 16,
+          color: color,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          hasValue
+              ? '${percent.toStringAsFixed(1)}% $label'
+              : 'No data $label',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _monthlyChart(UsageState usage, UtilityType utility, Color accent,
+      Color surface) {
+    final months = _lastSixMonths();
+    final values =
+        months.map((m) => usage.entryForMonth(utility, m)).toList();
+    final labels = months.map(_monthLabel).toList();
+    final maxV = values
+        .whereType<UtilityEntry>()
+        .map((e) => e.value)
+        .fold<double>(0, (a, b) => a > b ? a : b);
+    final chartMax = maxV <= 0 ? 10.0 : maxV * 1.2;
 
     return AppCard(
       child: Column(
@@ -404,230 +497,268 @@ class _CompareUsageScreenState extends State<CompareUsageScreen>
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const SectionLabel('DAILY (JUL 2025)'),
-              Text('per day in $unit',
+              const SectionLabel('MONTHLY CONSUMPTION'),
+              Text('last 6 months · ${utility.unit}',
                   style: const TextStyle(
                     fontSize: 11,
                     color: AppColors.textTertiary,
                   )),
             ],
           ),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            children: [
-              const Icon(Icons.swipe, size: 13, color: AppColors.textTertiary),
-              const SizedBox(width: 4),
-              Text('Swipe · ${data.length} days',
-                  style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.textTertiary,
-                      fontStyle: FontStyle.italic)),
-            ],
-          ),
-          const SizedBox(height: 8),
-          SizedBox(
-            height: chartHeight + labelHeight + scrollbarPad,
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const ClampingScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: scrollbarPad),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      height: chartHeight,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          for (int i = 0; i < data.length; i++) ...[
-                            Container(
-                              width: barWidth,
-                              height: (data[i] / maxV) * chartHeight,
-                              decoration: BoxDecoration(
-                                color: accent.withValues(alpha: 0.55),
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(4),
-                                  topRight: Radius.circular(4),
-                                ),
-                              ),
-                            ),
-                            if (i < data.length - 1)
-                              const SizedBox(width: barGap),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    SizedBox(
-                      height: labelHeight - 4,
-                      child: Row(
-                        children: [
-                          for (int i = 0; i < data.length; i++) ...[
-                            SizedBox(
-                              width: barWidth,
-                              child: Text(
-                                '${i + 1}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  color: AppColors.textTertiary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                            if (i < data.length - 1)
-                              const SizedBox(width: barGap),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _monthlyHistory(
-      List<_MonthUsage> months, String unit, Color accent, Color surface) {
-    final maxV = months.map((m) => m.value).reduce((a, b) => a > b ? a : b);
-    final minV = months.map((m) => m.value).reduce((a, b) => a < b ? a : b);
-    final range = maxV - minV;
-    const rowHeight = 44.0;
-    final visibleRows = months.length > 4 ? 4 : months.length;
-    final scrollHeight = rowHeight * visibleRows;
-
-    return AppCard(
-      padding: EdgeInsets.zero,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 4),
-            child: SectionLabel('MONTHLY HISTORY'),
-          ),
-          if (months.length > 4)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  const Icon(Icons.swap_vert,
-                      size: 13, color: AppColors.textTertiary),
-                  const SizedBox(width: 4),
-                  Text('Scroll · ${months.length} months',
-                      style: const TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textTertiary,
-                          fontStyle: FontStyle.italic)),
-                ],
-              ),
-            ),
-          SizedBox(
-            height: scrollHeight,
-            child: Scrollbar(
-              thumbVisibility: true,
-              child: ListView.builder(
-                padding: const EdgeInsets.only(right: 4),
-                physics: const ClampingScrollPhysics(),
-                itemCount: months.length,
-                itemExtent: rowHeight,
-                itemBuilder: (ctx, i) => _monthRow(
-                  months[i],
-                  unit,
-                  accent,
-                  surface,
-                  minV,
-                  range,
-                ),
-              ),
-            ),
-          ),
           const SizedBox(height: 12),
+          if (maxV <= 0)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Text(
+                  'No readings yet — tap "Add +" to log your first month.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textSecondary),
+                ),
+              ),
+            )
+          else
+            SizedBox(
+              height: 180,
+              child: BarChart(
+                BarChartData(
+                  maxY: chartMax,
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipColor: (_) => AppColors.textPrimary,
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final entry = values[group.x];
+                        if (entry == null) return null;
+                        return BarTooltipItem(
+                          '${entry.value.toStringAsFixed(1)} ${utility.unit}',
+                          const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                  gridData: const FlGridData(show: false),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 22,
+                        getTitlesWidget: (v, meta) {
+                          final i = v.round();
+                          if (i < 0 || i >= labels.length) {
+                            return const SizedBox.shrink();
+                          }
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              labels[i],
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textTertiary,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                  barGroups: List.generate(months.length, (i) {
+                    final entry = values[i];
+                    return BarChartGroupData(
+                      x: i,
+                      barRods: [
+                        BarChartRodData(
+                          toY: entry?.value ?? 0,
+                          width: 22,
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(4),
+                            topRight: Radius.circular(4),
+                          ),
+                          color: entry == null
+                              ? surface
+                              : accent.withValues(alpha: 0.75),
+                        ),
+                      ],
+                    );
+                  }),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Widget _monthRow(
-    _MonthUsage m,
-    String unit,
-    Color accent,
-    Color surface,
-    double minV,
-    double range,
-  ) {
+  List<DateTime> _lastSixMonths() {
+    final now = DateTime.now();
+    return List.generate(6, (i) {
+      final monthsAgo = 5 - i;
+      return DateTime(now.year, now.month - monthsAgo, 1);
+    });
+  }
+
+  String _monthLabel(DateTime d) {
+    const names = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return names[d.month - 1];
+  }
+}
+
+class _RecordLogRow extends StatefulWidget {
+  final UtilityEntry entry;
+  final UtilityType utility;
+  final Color accent;
+
+  const _RecordLogRow({
+    required this.entry,
+    required this.utility,
+    required this.accent,
+  });
+
+  @override
+  State<_RecordLogRow> createState() => _RecordLogRowState();
+}
+
+class _RecordLogRowState extends State<_RecordLogRow> {
+  bool _editing = false;
+  bool _saving = false;
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        TextEditingController(text: widget.entry.value.toStringAsFixed(1));
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    final value = double.tryParse(_controller.text.trim());
+    if (value == null || value < 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Enter a valid number'),
+        backgroundColor: AppColors.critical,
+      ));
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await context.read<UsageState>().addEntry(
+            utility: widget.utility,
+            value: value,
+            month: widget.entry.periodMonth,
+          );
+      if (mounted) setState(() => _editing = false);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not save: $e'),
+          backgroundColor: AppColors.critical,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _cancel() {
+    _controller.text = widget.entry.value.toStringAsFixed(1);
+    setState(() => _editing = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      padding: const EdgeInsets.fromLTRB(16, 10, 12, 10),
       child: Row(
         children: [
           SizedBox(
-            width: 72,
-            child: Text(m.label,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                )),
-          ),
-          if (m.current) ...[
-            const SizedBox(width: 4),
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppColors.successSurface,
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const Text(
-                'Current',
-                style: TextStyle(
-                  fontSize: 9,
-                  color: AppColors.success,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(width: 10),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: range == 0
-                    ? 0.8
-                    : (0.3 + (m.value - minV) / range * 0.6)
-                        .clamp(0.0, 1.0),
-                minHeight: 6,
-                backgroundColor: surface,
-                valueColor: AlwaysStoppedAnimation<Color>(accent),
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Text('${m.value.toStringAsFixed(1)} $unit',
+            width: 80,
+            child: Text(
+              _monthYearLabel(widget.entry.periodMonth),
               style: const TextStyle(
                 fontSize: 13,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
-              )),
+              ),
+            ),
+          ),
+          Expanded(
+            child: _editing
+                ? TextField(
+                    controller: _controller,
+                    autofocus: true,
+                    enabled: !_saving,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 8),
+                      suffixText: widget.utility.unit,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  )
+                : Text(
+                    '${widget.entry.value.toStringAsFixed(1)} ${widget.utility.unit}',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 8),
+          if (_saving)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (_editing) ...[
+            IconButton(
+              icon: const Icon(Icons.check, size: 18),
+              color: AppColors.success,
+              visualDensity: VisualDensity.compact,
+              onPressed: _save,
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, size: 18),
+              color: AppColors.textTertiary,
+              visualDensity: VisualDensity.compact,
+              onPressed: _cancel,
+            ),
+          ] else
+            IconButton(
+              icon: const Icon(Icons.edit_outlined, size: 18),
+              color: widget.accent,
+              visualDensity: VisualDensity.compact,
+              onPressed: () => setState(() => _editing = true),
+            ),
         ],
       ),
     );
   }
-
-}
-
-class _MonthUsage {
-  final String label;
-  final double value;
-  final bool current;
-  const _MonthUsage(this.label, this.value, {this.current = false});
 }

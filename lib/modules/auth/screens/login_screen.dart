@@ -37,7 +37,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     final auth = context.read<RoleState>();
-    await auth.login(_emailController.text.trim(), _passwordController.text);
+    final success = await auth.login(
+        _emailController.text.trim(), _passwordController.text);
+    if (success && mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   String _roleLabel() {

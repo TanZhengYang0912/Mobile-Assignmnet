@@ -27,6 +27,7 @@ import 'modules/dataset/state/dataset_state.dart';
 import 'modules/usage/screens/customer_home_screen.dart';
 import 'modules/usage/screens/compare_usage_screen.dart';
 import 'modules/usage/screens/report_problem_screen.dart';
+import 'modules/usage/state/usage_state.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -72,6 +73,9 @@ class MySumberApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<DatasetState>(
           create: (_) => DatasetState(repository: DatasetRepository()),
+        ),
+        ChangeNotifierProvider<UsageState>(
+          create: (_) => UsageState(),
         ),
       ],
       child: MaterialApp(
@@ -169,6 +173,11 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _setupScreensByRole();
+    if (widget.userRole == 'user') {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) context.read<UsageState>().init();
+      });
+    }
   }
 
   void _setupScreensByRole() {
