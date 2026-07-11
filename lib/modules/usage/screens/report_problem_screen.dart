@@ -59,6 +59,50 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
     );
   }
 
+  Future<void> _confirmDeleteAccount(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Icons.warning_amber_rounded,
+                color: AppColors.critical, size: 20),
+            SizedBox(width: 8),
+            Text('Delete Account'),
+          ],
+        ),
+        content: const Text(
+          'This permanently deletes your account and all your logged usage '
+          'data. This cannot be undone.',
+          style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.critical),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final ok = await context.read<RoleState>().deleteAccount();
+    if (!context.mounted) return;
+    if (!ok) {
+      final error = context.read<RoleState>().errorMessage;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error ?? 'Could not delete account'),
+        backgroundColor: AppColors.critical,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final role = context.watch<RoleState>();
@@ -104,6 +148,20 @@ class _ReportProblemScreenState extends State<ReportProblemScreen> {
                     borderRadius: BorderRadius.circular(14)),
                 textStyle: const TextStyle(
                     fontSize: 15, fontWeight: FontWeight.w800),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+            child: TextButton.icon(
+              onPressed: () => _confirmDeleteAccount(context),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              label: const Text('Delete Account'),
+              style: TextButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
+                foregroundColor: AppColors.critical,
+                textStyle: const TextStyle(
+                    fontSize: 14, fontWeight: FontWeight.w700),
               ),
             ),
           ),

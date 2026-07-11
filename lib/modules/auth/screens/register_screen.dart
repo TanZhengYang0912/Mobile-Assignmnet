@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../../usage/screens/profile_setup_screen.dart';
 import '../state/auth_state.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -20,6 +19,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPassword = false;
   bool _showConfirmPassword = false;
   bool _agreedToTerms = false;
+  bool _navigated = false;
 
   @override
   void dispose() {
@@ -80,16 +80,78 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
 
     final auth = context.read<RoleState>();
-    final success = await auth.register(
+    await auth.register(
       _emailController.text.trim(),
       _passwordController.text,
     );
+  }
 
-    if (success && mounted) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const ProfileSetupScreen()),
-      );
-    }
+  /// Shared between the "no confirmation required" path (account is
+  /// immediately usable) and the async email-confirmation-link path. Just
+  /// reveals the app root, which renders the wizard itself once
+  /// [RoleState.isLoggedIn] is true (a fresh account always needs it).
+  void _navigateAfterRegister(RoleState auth) {
+    if (_navigated || !auth.isLoggedIn) return;
+    _navigated = true;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Widget _confirmEmailPanel(RoleState auth) {
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.blue.shade50,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.mark_email_read_outlined,
+                  color: Colors.blue.shade700, size: 36),
+              const SizedBox(height: 12),
+              const Text(
+                'Confirm your account',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'We sent a confirmation link to ${auth.pendingEmail} — click '
+                'it to activate your account and continue.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13, color: Colors.grey.shade700, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        if (auth.errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              auth.errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.red.shade700, fontSize: 13),
+            ),
+          ),
+        const SizedBox(height: 20),
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton(
+            onPressed: () => auth.resendVerificationEmail(),
+            child: const Text('Resend email'),
+          ),
+        ),
+        const SizedBox(height: 10),
+        TextButton(
+          onPressed: () {
+            auth.cancelSecondFactor();
+            widget.onBack();
+          },
+          child: const Text('Back'),
+        ),
+      ],
+    );
   }
 
   @override
@@ -101,7 +163,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          onPressed: widget.onBack,
+          onPressed: () {
+            context.read<RoleState>().cancelSecondFactor();
+            widget.onBack();
+          },
         ),
       ),
       body: SingleChildScrollView(
@@ -121,6 +186,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             const SizedBox(height: 40),
             Consumer<RoleState>(
               builder: (context, auth, _) {
+                if (auth.isLoggedIn && !_navigated) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _navigateAfterRegister(auth);
+                  });
+                }
+                if (auth.awaitingSecondFactor) {
+                  return _confirmEmailPanel(auth);
+                }
                 return Column(
                   children: [
                     TextField(

@@ -26,6 +26,7 @@ import 'modules/dataset/state/dataset_state.dart';
 
 import 'modules/usage/screens/customer_home_screen.dart';
 import 'modules/usage/screens/compare_usage_screen.dart';
+import 'modules/usage/screens/profile_setup_screen.dart';
 import 'modules/usage/screens/report_problem_screen.dart';
 import 'modules/usage/state/usage_state.dart';
 
@@ -145,6 +146,14 @@ class MySumberApp extends StatelessWidget {
         home: Consumer<RoleState>(
           builder: (BuildContext context, RoleState authState, Widget? _) {
             if (authState.isLoggedIn) {
+              // Authoritative regardless of how the session arrived — a
+              // cold app start via the email-link deep link never has
+              // LoginScreen mounted to redirect from, so this has to be
+              // decided here, not by whichever screen happened to trigger
+              // the sign-in.
+              if (authState.needsProfileSetup) {
+                return const ProfileSetupScreen();
+              }
               return AppShell(userRole: authState.userRole!);
             }
             return const LandingScreen();

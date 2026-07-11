@@ -17,6 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _showPassword = false;
+  bool _navigated = false;
 
   @override
   void initState() {
@@ -37,11 +38,78 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     final auth = context.read<RoleState>();
-    final success = await auth.login(
-        _emailController.text.trim(), _passwordController.text);
-    if (success && mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-    }
+    await auth.login(_emailController.text.trim(), _passwordController.text);
+  }
+
+  /// Shared by email/password login and the async Google OAuth callback.
+  /// Just reveals whatever the app root is now showing underneath (it
+  /// decides wizard vs. main app from [RoleState] itself) — this never
+  /// picks the destination directly, since a cold app start via the
+  /// email-link deep link wouldn't have this screen mounted to do that.
+  void _navigateAfterAuth(RoleState auth) {
+    if (_navigated || !auth.isLoggedIn) return;
+    _navigated = true;
+    Navigator.of(context).popUntil((route) => route.isFirst);
+  }
+
+  Widget _verifyEmailPanel(RoleState auth, Color primary) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: primary.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              Icon(Icons.mark_email_read_outlined, color: primary, size: 36),
+              const SizedBox(height: 12),
+              const Text(
+                'Check your email',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your password is correct. For extra security, we sent a '
+                'confirmation link to ${auth.pendingEmail} — click it to '
+                'finish signing in.',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontSize: 13, color: AppColors.textSecondary, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        if (auth.errorMessage != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Text(
+              auth.errorMessage!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.critical, fontSize: 13),
+            ),
+          ),
+        const SizedBox(height: 20),
+        OutlinedButton(
+          onPressed: () => auth.resendVerificationEmail(),
+          style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+          child: const Text('Resend email'),
+        ),
+        const SizedBox(height: 10),
+        TextButton(
+          onPressed: () {
+            auth.cancelSecondFactor();
+            _passwordController.clear();
+          },
+          child: const Text('Use a different account'),
+        ),
+      ],
+    );
   }
 
   String _roleLabel() {
@@ -121,6 +189,14 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 28),
               Consumer<RoleState>(
                 builder: (context, auth, _) {
+                  if (auth.isLoggedIn && !_navigated) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) _navigateAfterAuth(auth);
+                    });
+                  }
+                  if (auth.awaitingSecondFactor) {
+                    return _verifyEmailPanel(auth, primary);
+                  }
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -207,6 +283,53 @@ class _LoginScreenState extends State<LoginScreen> {
                         label: Text(auth.isLoading ? 'Signing in…' : 'Sign In'),
                       ),
                       if (isCustomer) ...[
+                        const SizedBox(height: 18),
+                        Row(
+                          children: [
+                            const Expanded(child: Divider()),
+                            Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 10),
+                              child: Text('or',
+                                  style: TextStyle(
+                                      color: AppColors.textTertiary,
+                                      fontSize: 13)),
+                            ),
+                            const Expanded(child: Divider()),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        OutlinedButton(
+                          onPressed: auth.isLoading
+                              ? null
+                              : () => auth.signInWithGoogle(),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(52),
+                            side: const BorderSide(color: AppColors.divider),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.network(
+                                'https://www.gstatic.com/images/branding/product/1x/googleg_standard_color_18dp.png',
+                                height: 18,
+                                width: 18,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.g_mobiledata,
+                                    size: 22,
+                                    color: AppColors.textSecondary),
+                              ),
+                              const SizedBox(width: 10),
+                              const Text(
+                                'Sign in with Google',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         const SizedBox(height: 14),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,

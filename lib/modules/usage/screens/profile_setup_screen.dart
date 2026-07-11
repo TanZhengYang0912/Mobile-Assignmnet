@@ -97,7 +97,8 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
       return;
     }
     if (!mounted) return;
-    final ok = await context.read<RoleState>().completeProfileSetup(
+    final role = context.read<RoleState>();
+    final ok = await role.completeProfileSetup(
           displayName: _nameController.text.trim(),
           gender: _gender!,
           phoneNumber: _phoneController.text.trim(),
@@ -106,12 +107,17 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
         );
     if (!mounted) return;
     if (ok) {
+      // Don't navigate manually — completeProfileSetup's notifyListeners()
+      // makes the app root itself swap from this wizard to AppShell now
+      // that needsProfileSetup is false. Also, this screen is always the
+      // app root (never pushed), so PopScope(canPop: false) above would
+      // block an explicit pop here anyway.
       context.read<UsageState>().selectState(resolved.state);
-      Navigator.of(context).popUntil((route) => route.isFirst);
     } else {
       setState(() {
         _saving = false;
-        _error = 'Could not save your profile. Please try again.';
+        _error = role.errorMessage ??
+            'Could not save your profile. Please try again.';
       });
     }
   }
