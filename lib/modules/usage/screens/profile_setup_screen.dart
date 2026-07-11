@@ -130,6 +130,38 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
     });
   }
 
+  /// Escape hatch for when the wizard itself is broken (e.g. the address
+  /// lookup is down) so a real bug here can never permanently lock someone
+  /// out of the app. You can finish setup later from the Profile tab.
+  Future<void> _confirmSkip() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Skip for now?'),
+        content: const Text(
+          'You can finish setting up your name, gender, phone number, and '
+          'address later from the Profile tab.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style:
+                FilledButton.styleFrom(backgroundColor: AppColors.customerPrimary),
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: const Text('Skip'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) {
+      context.read<RoleState>().skipProfileSetupForNow();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -161,12 +193,28 @@ class _ProfileSetupScreenState extends State<ProfileSetupScreen> {
                           fontWeight: FontWeight.w700,
                           color: AppColors.textSecondary,
                         )),
-                    Text('${(((_step + 1) / _totalSteps) * 100).round()}%',
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.customerPrimary,
-                        )),
+                    Row(
+                      children: [
+                        Text('${(((_step + 1) / _totalSteps) * 100).round()}%',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.customerPrimary,
+                            )),
+                        const SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: _confirmSkip,
+                          child: const Text(
+                            'Skip for now',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textTertiary,
+                              decoration: TextDecoration.underline,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ),
                 const SizedBox(height: 8),

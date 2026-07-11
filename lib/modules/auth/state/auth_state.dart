@@ -23,6 +23,7 @@ class RoleState extends ChangeNotifier {
   String? _errorMessage;
   bool _awaitingSecondFactor = false;
   String? _pendingEmail;
+  bool _profileSetupSkipped = false;
   late final StreamSubscription<AuthState> _authSubscription;
 
   /// True for the brief window in [login] between the factor-1 password
@@ -76,6 +77,7 @@ class RoleState extends ChangeNotifier {
   /// sign-ins, which have no other "first time" signal) into the wizard.
   bool get needsProfileSetup {
     if (_userRole != 'user') return false;
+    if (_profileSetupSkipped) return false;
     final m = _metadata;
     if (m == null) return true;
     bool has(String key) => (m[key] as String?)?.trim().isNotEmpty == true;
@@ -83,6 +85,15 @@ class RoleState extends ChangeNotifier {
         has('gender') &&
         has('phone_number') &&
         has('service_address'));
+  }
+
+  /// Escape hatch for when the wizard itself is broken (e.g. the address
+  /// lookup service is down) — lets the user into the app for this session
+  /// without saving anything. Cleared on [logout], so the wizard is
+  /// enforced again on the next fresh sign-in.
+  void skipProfileSetupForNow() {
+    _profileSetupSkipped = true;
+    notifyListeners();
   }
 
   /// Custom display name if the user has set one (Profile tab), otherwise
@@ -331,6 +342,7 @@ class RoleState extends ChangeNotifier {
       _userRole = null;
       _email = null;
       _errorMessage = null;
+      _profileSetupSkipped = false;
       _isLoading = false;
       notifyListeners();
     } catch (e) {
@@ -365,6 +377,7 @@ class RoleState extends ChangeNotifier {
       await Supabase.instance.client.auth.signOut();
       _userRole = null;
       _email = null;
+      _profileSetupSkipped = false;
       _isLoading = false;
       notifyListeners();
       return true;
