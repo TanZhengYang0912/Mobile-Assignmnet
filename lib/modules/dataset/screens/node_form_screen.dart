@@ -19,6 +19,7 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
   late final TextEditingController _nameController;
+  late final TextEditingController _facilityController;
   late final TextEditingController _manufacturerController;
   late final TextEditingController _ipController;
   late final TextEditingController _firmwareController;
@@ -34,9 +35,22 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
   final _editableFormat = DateFormat('dd/MM/yyyy');
 
   static const _malaysianStates = [
-    'Johor', 'Kedah', 'Kelantan', 'Melaka', 'Negeri Sembilan', 'Pahang',
-    'Perak', 'Perlis', 'Pulau Pinang', 'Sabah', 'Sarawak', 'Selangor',
-    'Terengganu', 'W.P. Kuala Lumpur', 'W.P. Labuan', 'W.P. Putrajaya'
+    'Johor',
+    'Kedah',
+    'Kelantan',
+    'Melaka',
+    'Negeri Sembilan',
+    'Pahang',
+    'Perak',
+    'Perlis',
+    'Pulau Pinang',
+    'Sabah',
+    'Sarawak',
+    'Selangor',
+    'Terengganu',
+    'W.P. Kuala Lumpur',
+    'W.P. Labuan',
+    'W.P. Putrajaya'
   ];
 
   static const _utilityTypes = ['Water', 'Electricity'];
@@ -48,6 +62,8 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.node?.nodeName ?? '');
+    _facilityController =
+        TextEditingController(text: widget.node?.facilityName ?? '');
     _manufacturerController =
         TextEditingController(text: widget.node?.manufacturer ?? '');
     _ipController = TextEditingController(text: widget.node?.ipAddress ?? '');
@@ -69,6 +85,7 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _facilityController.dispose();
     _manufacturerController.dispose();
     _ipController.dispose();
     _firmwareController.dispose();
@@ -83,6 +100,8 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
       utilityType: _utilityType,
       status: _status,
       zoneId: _zoneId,
+      facilityName: _facilityController.text.trim(),
+      facilityCity: widget.node?.facilityCity,
       manufacturer: _manufacturerController.text.trim(),
       firmwareVersion: _firmwareController.text.trim(),
       ipAddress: _ipController.text.trim(),
@@ -128,8 +147,15 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
                       _textFieldRow(
                         label: 'Equipment Name',
                         controller: _nameController,
+                        validator: (v) =>
+                            (v == null || v.trim().isEmpty) ? 'Required' : null,
+                      ),
+                      const _RowDivider(),
+                      _textFieldRow(
+                        label: 'Shopping Mall / Facility',
+                        controller: _facilityController,
                         validator: (v) => (v == null || v.trim().isEmpty)
-                            ? 'Required'
+                            ? 'Facility is required'
                             : null,
                       ),
                       const _RowDivider(),
@@ -148,7 +174,7 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
                       ),
                       const _RowDivider(),
                       _pickerRow(
-                        label: 'Zone / State',
+                        label: 'State / Federal Territory',
                         value: _zoneId,
                         onTap: _showStatePicker,
                       ),
@@ -174,8 +200,7 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
                           if (v == null || v.trim().isEmpty) {
                             return 'IP Address is required';
                           }
-                          final ip =
-                              RegExp(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$');
+                          final ip = RegExp(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$');
                           if (!ip.hasMatch(v.trim())) {
                             return 'Enter a valid IPv4 (e.g. 192.168.1.1)';
                           }
@@ -506,8 +531,8 @@ class _NodeFormScreenState extends State<NodeFormScreen> {
                     child: ListView.separated(
                       physics: const ClampingScrollPhysics(),
                       itemCount: _malaysianStates.length,
-                      separatorBuilder: (_, __) => const Divider(
-                          height: 1, indent: 20, endIndent: 20),
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, indent: 20, endIndent: 20),
                       itemBuilder: (_, i) {
                         final s = _malaysianStates[i];
                         final selected = s == _zoneId;
@@ -672,8 +697,18 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
 
   static const _weekdayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
   static const _monthNames = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December'
   ];
 
   @override
@@ -777,8 +812,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
             for (int week = 0; week < 6; week++)
               Row(
                 children: List.generate(7, (dow) {
-                  final date =
-                      gridStart.add(Duration(days: week * 7 + dow));
+                  final date = gridStart.add(Duration(days: week * 7 + dow));
                   final isCurrentMonth = date.month == _visibleMonth.month;
                   final isSelected = _sameDay(date, _selected);
                   final isToday = _sameDay(date, todayNorm);
@@ -788,8 +822,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                       child: InkWell(
                         onTap: () {
                           setState(() => _selected = date);
-                          Navigator.of(context)
-                              .pop(_CalendarResult(date));
+                          Navigator.of(context).pop(_CalendarResult(date));
                         },
                         borderRadius: BorderRadius.circular(6),
                         child: Container(
@@ -797,8 +830,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                           decoration: isSelected
                               ? BoxDecoration(
                                   border: Border.all(
-                                      color: AppColors.textPrimary,
-                                      width: 1.4),
+                                      color: AppColors.textPrimary, width: 1.4),
                                   borderRadius: BorderRadius.circular(6),
                                 )
                               : null,
@@ -829,8 +861,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                       Navigator.of(context).pop(const _CalendarResult(null)),
                   borderRadius: BorderRadius.circular(6),
                   child: const Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     child: Text(
                       'Clear',
                       style: TextStyle(
@@ -850,8 +881,7 @@ class _CalendarPickerDialogState extends State<_CalendarPickerDialog> {
                   },
                   borderRadius: BorderRadius.circular(6),
                   child: const Padding(
-                    padding:
-                        EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                     child: Text(
                       'Today',
                       style: TextStyle(

@@ -49,6 +49,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
         final query = _searchQuery.toLowerCase();
         return node.nodeName.toLowerCase().contains(query) ||
             (node.zoneId ?? '').toLowerCase().contains(query) ||
+            (node.facilityName ?? '').toLowerCase().contains(query) ||
+            (node.facilityCity ?? '').toLowerCase().contains(query) ||
             (node.manufacturer?.toLowerCase().contains(query) ?? false);
       }
       return true;
@@ -68,8 +70,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child:
-                      _filterChips(nodes.length, waterCount, elecCount),
+                  child: _filterChips(nodes.length, waterCount, elecCount),
                 ),
                 const SizedBox(height: 12),
                 if (displayNodes.isEmpty)
@@ -183,7 +184,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Import Equipment Data'),
         content: const Text(
-            'Bulk-import 4 predefined equipment records from the sample CSV?'),
+            'Bulk-import 4 predefined equipment records from the sample data?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
@@ -207,23 +208,26 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   void _processImport() {
     final state = context.read<DatasetState>();
-    const csvString = '''node_name,utility_type,zone_id,manufacturer,status
-Smart Water Meter X1,Water,Johor,AquaTech,Active
-High-Voltage Transformer,Electricity,Selangor,Siemens,Critical
-Main Valve B,Water,Kedah,FlowMaster,Warning
-Backup Generator 2,Electricity,Kelantan,Honda,Active''';
+    const csvString =
+        '''node_name,utility_type,zone_id,facility_city,facility_name,manufacturer,status
+Smart Water Meter X1,Water,Johor,Johor Bahru,Mid Valley Southkey,AquaTech,Active
+High-Voltage Transformer,Electricity,Selangor,Petaling Jaya,1 Utama Shopping Centre,Siemens,Critical
+Main Valve B,Water,Kedah,Alor Setar,Aman Central,FlowMaster,Warning
+Backup Generator 2,Electricity,Kelantan,Kota Bharu,AEON Mall Kota Bharu,Honda,Active''';
 
     final lines = csvString.split('\n');
     int count = 0;
     for (int i = 1; i < lines.length; i++) {
       final parts = lines[i].split(',');
-      if (parts.length >= 5) {
+      if (parts.length >= 7) {
         state.addOrUpdateNode(EquipmentNode(
           nodeName: parts[0],
           utilityType: parts[1],
           zoneId: parts[2],
-          manufacturer: parts[3],
-          status: parts[4],
+          facilityCity: parts[3],
+          facilityName: parts[4],
+          manufacturer: parts[5],
+          status: parts[6],
           installationDate: DateTime.now(),
         ));
         count++;
@@ -293,8 +297,7 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                 style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color:
-                        selected ? Colors.white : AppColors.textPrimary)),
+                    color: selected ? Colors.white : AppColors.textPrimary)),
           ],
         ),
       ),
@@ -303,7 +306,8 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
 
   Widget _equipmentCard(EquipmentNode node, DatasetState state) {
     final isWater = node.utilityType == 'Water';
-    final accent = isWater ? AppColors.waterAccent : AppColors.electricityAccent;
+    final accent =
+        isWater ? AppColors.waterAccent : AppColors.electricityAccent;
     final surface =
         isWater ? AppColors.waterSurface : AppColors.electricitySurface;
 
@@ -385,7 +389,9 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
-                          isWater ? Icons.water_drop_outlined : Icons.electric_bolt,
+                          isWater
+                              ? Icons.water_drop_outlined
+                              : Icons.electric_bolt,
                           color: accent,
                         ),
                       ),
@@ -398,8 +404,8 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                           decoration: BoxDecoration(
                             color: statusColor,
                             shape: BoxShape.circle,
-                            border: Border.all(
-                                color: AppColors.surface, width: 2),
+                            border:
+                                Border.all(color: AppColors.surface, width: 2),
                           ),
                         ),
                       ),
@@ -411,6 +417,15 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
+                          node.facilityName ?? 'Unassigned facility',
+                          style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.adminPrimary),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
                           node.nodeName,
                           style: const TextStyle(
                               fontSize: 15,
@@ -420,10 +435,9 @@ Backup Generator 2,Electricity,Kelantan,Honda,Active''';
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          '${node.zoneId ?? '—'} · ${node.manufacturer ?? 'Unknown'}',
+                          '${node.zoneId ?? '—'} · ${node.facilityCity ?? '—'} · ${node.manufacturer ?? 'Unknown'}',
                           style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary),
+                              fontSize: 12, color: AppColors.textSecondary),
                         ),
                         const SizedBox(height: 8),
                         Row(

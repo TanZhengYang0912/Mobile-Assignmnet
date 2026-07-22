@@ -26,7 +26,9 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
       body: Consumer<DatasetState>(
         builder: (context, state, child) {
           final node = state.selectedNode;
-          if (node == null) return const Center(child: Text('No Node Selected'));
+          if (node == null) {
+            return const Center(child: Text('No Node Selected'));
+          }
 
           return SingleChildScrollView(
             child: Column(
@@ -56,7 +58,9 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           Row(
             children: [
               Icon(
-                node.utilityType == 'Water' ? Icons.water_drop : Icons.electric_bolt,
+                node.utilityType == 'Water'
+                    ? Icons.water_drop
+                    : Icons.electric_bolt,
                 color: node.utilityType == 'Water' ? Colors.blue : Colors.amber,
                 size: 32,
               ),
@@ -64,7 +68,8 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
               Expanded(
                 child: Text(
                   node.nodeName,
-                  style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  style: const TextStyle(
+                      fontSize: 24, fontWeight: FontWeight.bold),
                 ),
               ),
               _buildStatusBadge(node.status),
@@ -72,8 +77,24 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${node.zoneId} • ${node.manufacturer ?? 'Unknown Manufacturer'}',
+            '${node.zoneId ?? 'Unknown region'} • ${node.facilityCity ?? 'Unknown city'}',
             style: const TextStyle(fontSize: 16, color: Colors.blueGrey),
+          ),
+          if (node.facilityName != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Facility: ${node.facilityName}',
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: Colors.teal,
+              ),
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            node.manufacturer ?? 'Unknown Manufacturer',
+            style: const TextStyle(fontSize: 14, color: Colors.blueGrey),
           ),
         ],
       ),
@@ -82,8 +103,11 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
 
   Widget _buildStatusBadge(String status) {
     Color color = Colors.orange;
-    if (status == 'Active') color = Colors.green;
-    else if (status == 'Critical') color = Colors.red;
+    if (status == 'Active') {
+      color = Colors.green;
+    } else if (status == 'Critical') {
+      color = Colors.red;
+    }
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -107,7 +131,10 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4)),
         ],
       ),
       child: Column(
@@ -183,14 +210,15 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
           rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
         ),
         gridData: FlGridData(show: true),
-        borderData: FlBorderData(show: true, border: Border.all(color: Colors.grey.shade200)),
+        borderData: FlBorderData(
+            show: true, border: Border.all(color: Colors.grey.shade200)),
       ),
     );
   }
 
   Widget _buildSpecsSection(EquipmentNode node) {
     final dateFormat = DateFormat.yMMMd();
-    
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.all(16),
@@ -201,25 +229,31 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Hardware Specifications', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text('Hardware Specifications',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
-          _buildSpecRow('IP Address', node.ipAddress ?? 'N/A', Icons.network_wifi),
-          const Divider(),
-          _buildSpecRow('Firmware', node.firmwareVersion ?? 'N/A', Icons.memory),
+          _buildSpecRow(
+              'IP Address', node.ipAddress ?? 'N/A', Icons.network_wifi),
           const Divider(),
           _buildSpecRow(
-            'Installed', 
-            node.installationDate != null ? dateFormat.format(node.installationDate!) : 'N/A',
-            Icons.event
-          ),
+              'Firmware', node.firmwareVersion ?? 'N/A', Icons.memory),
           const Divider(),
           _buildSpecRow(
-            'Last Maintenance', 
-            node.lastMaintenanceDate != null ? dateFormat.format(node.lastMaintenanceDate!) : 'N/A',
-            Icons.build
-          ),
+              'Installed',
+              node.installationDate != null
+                  ? dateFormat.format(node.installationDate!)
+                  : 'N/A',
+              Icons.event),
           const Divider(),
-          _buildSpecRow('Health Score', '${node.healthScore}%', Icons.health_and_safety),
+          _buildSpecRow(
+              'Last Maintenance',
+              node.lastMaintenanceDate != null
+                  ? dateFormat.format(node.lastMaintenanceDate!)
+                  : 'N/A',
+              Icons.build),
+          const Divider(),
+          _buildSpecRow(
+              'Health Score', '${node.healthScore}%', Icons.health_and_safety),
         ],
       ),
     );
@@ -232,9 +266,12 @@ class _EquipmentDetailScreenState extends State<EquipmentDetailScreen> {
         children: [
           Icon(icon, color: Colors.blueGrey, size: 20),
           const SizedBox(width: 12),
-          Text(label, style: const TextStyle(color: Colors.blueGrey, fontSize: 16)),
+          Text(label,
+              style: const TextStyle(color: Colors.blueGrey, fontSize: 16)),
           const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(value,
+              style:
+                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         ],
       ),
     );
