@@ -1,7 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'package:mysumber/modules/dataset/data/dataset_repository.dart';
 import 'package:mysumber/modules/dataset/models/models.dart';
+import 'package:mysumber/modules/dataset/screens/inventory_screen.dart';
+import 'package:mysumber/modules/dataset/state/dataset_state.dart';
 
 void main() {
   test('seeds every configured mall with the three core equipment types',
@@ -52,5 +56,27 @@ void main() {
 
     expect(restored.facilityName, '1 Utama Shopping Centre');
     expect(restored.facilityCity, 'Petaling Jaya');
+  });
+
+  testWidgets('inventory can open with a selected state filter',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 5000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final datasetState = DatasetState(repository: DatasetRepository());
+    datasetState.stateWaterSupply['Selangor'] = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<DatasetState>.value(
+          value: datasetState,
+          child: const InventoryScreen(initialState: 'Selangor'),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('State: Selangor'), findsOneWidget);
+    expect(find.text('Aman Central'), findsNothing);
   });
 }

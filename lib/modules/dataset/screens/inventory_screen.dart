@@ -9,7 +9,9 @@ import 'equipment_detail_screen.dart';
 import 'node_form_screen.dart';
 
 class InventoryScreen extends StatefulWidget {
-  const InventoryScreen({super.key});
+  final String? initialState;
+
+  const InventoryScreen({super.key, this.initialState});
 
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
@@ -18,11 +20,13 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   String _searchQuery = '';
   String _selectedUtility = 'All';
+  late String _selectedState;
   final _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    _selectedState = widget.initialState ?? 'All';
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<DatasetState>().loadNodes();
     });
@@ -42,6 +46,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final elecCount = nodes.where((n) => n.utilityType == 'Electricity').length;
 
     final displayNodes = nodes.where((node) {
+      if (_selectedState != 'All' && node.zoneId != _selectedState) {
+        return false;
+      }
       if (_selectedUtility != 'All' && node.utilityType != _selectedUtility) {
         return false;
       }
@@ -72,6 +79,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: _filterChips(nodes.length, waterCount, elecCount),
                 ),
+                if (_selectedState != 'All')
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                    child: _stateFilterChip(),
+                  ),
                 const SizedBox(height: 12),
                 if (displayNodes.isEmpty)
                   const Padding(
@@ -267,6 +279,24 @@ Backup Generator 2,Electricity,Kelantan,Kota Bharu,AEON Mall Kota Bharu,Honda,Ac
           _chip('Electricity ($elec)', 'Electricity',
               icon: Icons.electric_bolt_outlined),
         ],
+      ),
+    );
+  }
+
+  Widget _stateFilterChip() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: InputChip(
+        avatar: const Icon(Icons.location_on_outlined, size: 16),
+        label: Text('State: $_selectedState'),
+        onDeleted: () => setState(() => _selectedState = 'All'),
+        deleteIcon: const Icon(Icons.close, size: 16),
+        backgroundColor: AppColors.adminPrimary.withValues(alpha: 0.1),
+        side: BorderSide.none,
+        labelStyle: const TextStyle(
+          color: AppColors.adminPrimary,
+          fontWeight: FontWeight.w700,
+        ),
       ),
     );
   }

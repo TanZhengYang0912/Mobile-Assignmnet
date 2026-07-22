@@ -192,12 +192,12 @@ class _AppShellState extends State<AppShell> {
   void _setupScreensByRole() {
     switch (widget.userRole) {
       case 'admin':
-        _screens = const [
-          DashboardScreen(),
+        _screens = [
+          DashboardScreen(onStateTap: _openInventoryForState),
           InventoryScreen(),
-          AbnormalProductionScreen(),
-          OversightScreen(),
-          ReviewManagementScreen(),
+          const AbnormalProductionScreen(),
+          const OversightScreen(),
+          const ReviewManagementScreen(),
         ];
         _navItems = const [
           _NavItem(icon: Icons.grid_view_outlined, label: 'Dashboard'),
@@ -229,6 +229,13 @@ class _AppShellState extends State<AppShell> {
           _NavItem(icon: Icons.person_outline, label: 'Profile'),
         ];
     }
+  }
+
+  void _openInventoryForState(String state) {
+    setState(() {
+      _screens[1] = InventoryScreen(initialState: state);
+      _currentIndex = 1;
+    });
   }
 
   @override

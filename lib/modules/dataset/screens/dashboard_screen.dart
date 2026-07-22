@@ -7,7 +7,9 @@ import '../state/dataset_state.dart';
 import '../models/models.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final ValueChanged<String>? onStateTap;
+
+  const DashboardScreen({super.key, this.onStateTap});
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -47,8 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _header(context),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child:
-                      _systemOverviewCard(total, active, warning, critical),
+                  child: _systemOverviewCard(total, active, warning, critical),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -308,6 +309,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Top Water Loss',
                   state: topWater?.key ?? 'N/A',
                   value: '${_shortNum(topWater?.value ?? 0)} L$unit',
+                  onTap: topWater == null
+                      ? null
+                      : () => widget.onStateTap?.call(topWater.key),
                 ),
               ),
               const SizedBox(width: 10),
@@ -319,12 +323,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   label: 'Top Elec. Loss',
                   state: topElec?.key ?? 'N/A',
                   value: '${_shortNum(topElec?.value ?? 0)} Wh$unit',
+                  onTap: topElec == null
+                      ? null
+                      : () => widget.onStateTap?.call(topElec.key),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 20),
-          _horizontalLossChart(unionStates, waterLoss, elecLoss),
+          _horizontalLossChart(
+            unionStates,
+            waterLoss,
+            elecLoss,
+            onStateTap: widget.onStateTap,
+          ),
           const SizedBox(height: 12),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -346,41 +358,45 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required String label,
     required String state,
     required String value,
+    VoidCallback? onTap,
   }) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, color: color, size: 16),
-              const SizedBox(width: 4),
-              Flexible(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 16),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                        color: color,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(state,
-              style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary)),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-        ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(state,
+                style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary)),
+            Text(value,
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary)),
+          ],
+        ),
       ),
     );
   }
@@ -388,8 +404,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _horizontalLossChart(
     List<String> states,
     Map<String, double> waterLoss,
-    Map<String, double> elecLoss,
-  ) {
+    Map<String, double> elecLoss, {
+    ValueChanged<String>? onStateTap,
+  }) {
     if (states.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 24),
@@ -452,6 +469,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   water: waterLoss[states[i]] ?? 0,
                   electricity: elecLoss[states[i]] ?? 0,
                   scale: scale,
+                  onTap:
+                      onStateTap == null ? null : () => onStateTap(states[i]),
                 ),
               ),
             ),
@@ -476,33 +495,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required double water,
     required double electricity,
     required double scale,
+    VoidCallback? onTap,
   }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        SizedBox(
-          width: 72,
-          child: Text(
-            state,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
+    return GestureDetector(
+      onTap: onTap,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              state,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+              overflow: TextOverflow.ellipsis,
             ),
-            overflow: TextOverflow.ellipsis,
           ),
-        ),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _valueBar(water, scale, AppColors.waterAccent),
-              const SizedBox(height: 4),
-              _valueBar(electricity, scale, AppColors.electricityAccent),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _valueBar(water, scale, AppColors.waterAccent),
+                const SizedBox(height: 4),
+                _valueBar(electricity, scale, AppColors.electricityAccent),
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
