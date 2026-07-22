@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:mysumber/modules/dataset/data/dataset_repository.dart';
 import 'package:mysumber/modules/dataset/models/models.dart';
 import 'package:mysumber/modules/dataset/screens/inventory_screen.dart';
+import 'package:mysumber/modules/dataset/services/inventory_filter.dart';
 import 'package:mysumber/modules/dataset/state/dataset_state.dart';
 
 void main() {
@@ -78,5 +79,50 @@ void main() {
 
     expect(find.text('State: Selangor'), findsOneWidget);
     expect(find.text('Aman Central'), findsNothing);
+  });
+
+  test('filters Selangor to its nine equipment nodes', () async {
+    final nodes = await DatasetRepository().fetchNodes();
+    final result = filterEquipmentNodes(nodes: nodes, state: 'Selangor');
+
+    expect(result.nodes, hasLength(9));
+  });
+
+  test('filters a Selangor mall to its three core equipment nodes', () async {
+    final nodes = await DatasetRepository().fetchNodes();
+    final result = filterEquipmentNodes(
+      nodes: nodes,
+      state: 'Selangor',
+      facility: '1 Utama Shopping Centre',
+    );
+
+    expect(result.nodes, hasLength(3));
+  });
+
+  test('lists only facilities belonging to the selected state', () async {
+    final nodes = await DatasetRepository().fetchNodes();
+
+    expect(
+      facilitiesForState(nodes, 'Selangor'),
+      <String>[
+        '1 Utama Shopping Centre',
+        'Setia City Mall',
+        'Sunway Pyramid',
+      ],
+    );
+  });
+
+  test('combines state, mall, utility, and status filters', () async {
+    final nodes = await DatasetRepository().fetchNodes();
+    final result = filterEquipmentNodes(
+      nodes: nodes,
+      state: 'Selangor',
+      facility: '1 Utama Shopping Centre',
+      utility: 'Electricity',
+      status: 'Maintenance',
+    );
+
+    expect(result.nodes, hasLength(1));
+    expect(result.nodes.single.nodeName, 'Sub-Transformer B2');
   });
 }
