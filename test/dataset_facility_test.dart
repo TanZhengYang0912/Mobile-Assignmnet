@@ -133,4 +133,40 @@ void main() {
     expect(result.nodes, hasLength(1));
     expect(result.nodes.single.nodeName, 'Sub-Transformer B2');
   });
+
+  test('computes utility and status counts from the location scope', () async {
+    final nodes = await DatasetRepository().fetchNodes();
+    final result = filterEquipmentNodes(nodes: nodes);
+
+    expect(result.utilityCounts['Water'], 52);
+    expect(result.utilityCounts['Electricity'], 26);
+    expect(result.statusCounts['Active'], 65);
+    expect(result.statusCounts['Critical'], 7);
+    expect(result.statusCounts['Maintenance'], 6);
+  });
+
+  testWidgets('inventory exposes single-select status chips', (tester) async {
+    tester.view.physicalSize = const Size(800, 5000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final datasetState = DatasetState(repository: DatasetRepository());
+    datasetState.stateWaterSupply['Malaysia'] = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<DatasetState>.value(
+          value: datasetState,
+          child: const InventoryScreen(),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Active (65)'), findsOneWidget);
+    expect(find.text('Critical (7)'), findsOneWidget);
+
+    await tester.tap(find.text('Critical (7)'));
+    await tester.pump();
+    expect(find.text('Critical (7)'), findsOneWidget);
+  });
 }

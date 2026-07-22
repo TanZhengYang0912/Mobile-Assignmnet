@@ -21,6 +21,7 @@ class InventoryScreen extends StatefulWidget {
 class _InventoryScreenState extends State<InventoryScreen> {
   String _searchQuery = '';
   String _selectedUtility = 'All';
+  String _selectedStatus = 'All';
   late String _selectedState;
   String _selectedFacility = 'All';
   final _searchController = TextEditingController();
@@ -44,21 +45,23 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<DatasetState>();
     final nodes = state.nodes;
-    final waterCount = nodes.where((n) => n.utilityType == 'Water').length;
-    final elecCount = nodes.where((n) => n.utilityType == 'Electricity').length;
     final stateOptions = _stateOptions(nodes);
     final facilityOptions = [
       'All',
       ...facilitiesForState(nodes, _selectedState),
     ];
 
-    final displayNodes = filterEquipmentNodes(
+    final filterResult = filterEquipmentNodes(
       nodes: nodes,
       state: _selectedState,
       facility: _selectedFacility,
       utility: _selectedUtility,
+      status: _selectedStatus,
       query: _searchQuery,
-    ).nodes;
+    );
+    final locationCount = filterResult.utilityCounts.values
+        .fold<int>(0, (sum, count) => sum + count);
+    final displayNodes = filterResult.nodes;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -74,7 +77,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                  child: _filterChips(nodes.length, waterCount, elecCount),
+                  child: _filterChips(
+                    locationCount,
+                    filterResult.utilityCounts['Water'] ?? 0,
+                    filterResult.utilityCounts['Electricity'] ?? 0,
+                  ),
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
@@ -107,6 +114,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
                       ),
                     ],
                   ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                  child: _statusFilterChips(filterResult.statusCounts),
                 ),
                 const SizedBox(height: 12),
                 if (displayNodes.isEmpty)
@@ -378,6 +389,47 @@ Backup Generator 2,Electricity,Kelantan,Kota Bharu,AEON Mall Kota Bharu,Honda,Ac
                     fontWeight: FontWeight.w600,
                     color: selected ? Colors.white : AppColors.textPrimary)),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _statusFilterChips(Map<String, int> counts) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: inventoryStatusFilters.map((status) {
+          final label =
+              '$status (${status == 'All' ? counts.values.fold<int>(0, (sum, count) => sum + count) : counts[status] ?? 0})';
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: _statusChip(label, status),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _statusChip(String label, String value) {
+    final selected = _selectedStatus == value;
+    return GestureDetector(
+      onTap: () => setState(() => _selectedStatus = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.adminPrimary : Colors.white,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected ? AppColors.adminPrimary : AppColors.divider,
+          ),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: selected ? Colors.white : AppColors.textPrimary,
+          ),
         ),
       ),
     );
