@@ -119,6 +119,13 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
                   child: _statusFilterChips(filterResult.statusCounts),
                 ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _clearFilters,
+                    child: const Text('Clear filters'),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 if (displayNodes.isEmpty)
                   const Padding(
@@ -433,6 +440,17 @@ Backup Generator 2,Electricity,Kelantan,Kota Bharu,AEON Mall Kota Bharu,Honda,Ac
         ),
       ),
     );
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _selectedState = 'All';
+      _selectedFacility = 'All';
+      _selectedUtility = 'All';
+      _selectedStatus = 'All';
+      _searchQuery = '';
+      _searchController.clear();
+    });
   }
 
   Widget _equipmentCard(EquipmentNode node, DatasetState state) {

@@ -169,4 +169,31 @@ void main() {
     await tester.pump();
     expect(find.text('Critical (7)'), findsOneWidget);
   });
+
+  testWidgets('inventory clear filters restores the default selections',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 5000);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final datasetState = DatasetState(repository: DatasetRepository());
+    datasetState.stateWaterSupply['Selangor'] = 0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ChangeNotifierProvider<DatasetState>.value(
+          value: datasetState,
+          child: const InventoryScreen(initialState: 'Selangor'),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.text('Clear filters'), findsOneWidget);
+    await tester.tap(find.text('Clear filters'));
+    await tester.pump();
+
+    expect(find.text('All States'), findsOneWidget);
+    expect(find.text('All Shopping Malls'), findsOneWidget);
+    expect(find.text('All (78)'), findsNWidgets(2));
+  });
 }
