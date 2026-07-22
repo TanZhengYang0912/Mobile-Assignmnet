@@ -5,6 +5,7 @@ import '../../../theme/tokens.dart';
 import '../../auth/state/auth_state.dart';
 import '../state/dataset_state.dart';
 import '../models/models.dart';
+import '../services/inventory_filter.dart';
 import 'equipment_detail_screen.dart';
 import 'node_form_screen.dart';
 
@@ -21,6 +22,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   String _searchQuery = '';
   String _selectedUtility = 'All';
   late String _selectedState;
+  String _selectedFacility = 'All';
   final _searchController = TextEditingController();
 
   @override
@@ -44,24 +46,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final nodes = state.nodes;
     final waterCount = nodes.where((n) => n.utilityType == 'Water').length;
     final elecCount = nodes.where((n) => n.utilityType == 'Electricity').length;
+    final stateOptions = _stateOptions(nodes);
+    final facilityOptions = [
+      'All',
+      ...facilitiesForState(nodes, _selectedState),
+    ];
 
-    final displayNodes = nodes.where((node) {
-      if (_selectedState != 'All' && node.zoneId != _selectedState) {
-        return false;
-      }
-      if (_selectedUtility != 'All' && node.utilityType != _selectedUtility) {
-        return false;
-      }
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        return node.nodeName.toLowerCase().contains(query) ||
-            (node.zoneId ?? '').toLowerCase().contains(query) ||
-            (node.facilityName ?? '').toLowerCase().contains(query) ||
-            (node.facilityCity ?? '').toLowerCase().contains(query) ||
-            (node.manufacturer?.toLowerCase().contains(query) ?? false);
-      }
-      return true;
-    }).toList();
+    final displayNodes = filterEquipmentNodes(
+      nodes: nodes,
+      state: _selectedState,
+      facility: _selectedFacility,
+      utility: _selectedUtility,
+      query: _searchQuery,
+    ).nodes;
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -79,11 +76,38 @@ class _InventoryScreenState extends State<InventoryScreen> {
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                   child: _filterChips(nodes.length, waterCount, elecCount),
                 ),
-                if (_selectedState != 'All')
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                    child: _stateFilterChip(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: _locationDropdown(
+                          label: 'State / Federal Territory',
+                          value: _selectedState,
+                          items: stateOptions,
+                          displayAll: 'All States',
+                          onChanged: (value) {
+                            setState(() {
+                              _selectedState = value ?? 'All';
+                              _selectedFacility = 'All';
+                            });
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _locationDropdown(
+                          label: 'Shopping Mall',
+                          value: _selectedFacility,
+                          items: facilityOptions,
+                          displayAll: 'All Shopping Malls',
+                          onChanged: (value) => setState(
+                              () => _selectedFacility = value ?? 'All'),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
                 const SizedBox(height: 12),
                 if (displayNodes.isEmpty)
                   const Padding(
@@ -283,21 +307,46 @@ Backup Generator 2,Electricity,Kelantan,Kota Bharu,AEON Mall Kota Bharu,Honda,Ac
     );
   }
 
-  Widget _stateFilterChip() {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: InputChip(
-        avatar: const Icon(Icons.location_on_outlined, size: 16),
-        label: Text('State: $_selectedState'),
-        onDeleted: () => setState(() => _selectedState = 'All'),
-        deleteIcon: const Icon(Icons.close, size: 16),
-        backgroundColor: AppColors.adminPrimary.withValues(alpha: 0.1),
-        side: BorderSide.none,
-        labelStyle: const TextStyle(
-          color: AppColors.adminPrimary,
-          fontWeight: FontWeight.w700,
-        ),
+  List<String> _stateOptions(List<EquipmentNode> nodes) {
+    final states = nodes
+        .map((node) => node.zoneId)
+        .whereType<String>()
+        .toSet()
+        .toList()
+      ..sort();
+    if (_selectedState != 'All' && !states.contains(_selectedState)) {
+      states.insert(0, _selectedState);
+    }
+    return ['All', ...states];
+  }
+
+  Widget _locationDropdown({
+    required String label,
+    required String value,
+    required List<String> items,
+    required String displayAll,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      key: ValueKey('$label-$value'),
+      initialValue: value,
+      isExpanded: true,
+      decoration: InputDecoration(
+        labelText: label,
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       ),
+      items: items
+          .map((item) => DropdownMenuItem<String>(
+                value: item,
+                child: Text(
+                  item == 'All' ? displayAll : item,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ))
+          .toList(),
+      onChanged: onChanged,
     );
   }
 

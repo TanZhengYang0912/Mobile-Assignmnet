@@ -77,8 +77,16 @@ void main() {
     );
     await tester.pump(const Duration(seconds: 1));
 
-    expect(find.text('State: Selangor'), findsOneWidget);
+    expect(find.text('State / Federal Territory'), findsOneWidget);
+    expect(find.text('All Shopping Malls'), findsOneWidget);
     expect(find.text('Aman Central'), findsNothing);
+
+    await tester.tap(find.text('Selangor').last);
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.text('Johor').last);
+    await tester.pump();
+
+    expect(find.text('All Shopping Malls'), findsOneWidget);
   });
 
   test('filters Selangor to its nine equipment nodes', () async {
