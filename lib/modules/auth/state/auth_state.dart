@@ -8,6 +8,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 /// dashboard's Google provider settings.
 const googleOAuthRedirect = 'io.supabase.mysumber://login-callback';
 
+// Temporary development switch: allow password login without the email
+// second-factor link while the team is testing the rest of the app.
+const enableEmailSecondFactor = false;
+
 /// Hardcoded staff email -> role lookup. Anyone not listed here signs in
 /// as a normal user. Fix first; swap for a `profiles` table once role
 /// management needs to be self-service.
@@ -280,6 +284,17 @@ class RoleState extends ChangeNotifier {
         _verifyingCredentials = false;
         notifyListeners();
         return false;
+      }
+
+      if (!enableEmailSecondFactor) {
+        _verifyingCredentials = false;
+        _awaitingSecondFactor = false;
+        _pendingEmail = null;
+        _email = response.user!.email ?? email;
+        _userRole = _resolveRole(_email);
+        _isLoading = false;
+        notifyListeners();
+        return true;
       }
 
       await Supabase.instance.client.auth.signOut();
